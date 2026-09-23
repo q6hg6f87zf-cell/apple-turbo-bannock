@@ -10,7 +10,7 @@ The franchise ambition is larger than this chapter. Gate decisions require obser
 | Combat | Players explain guard timing, exposure and the Warden's changing pattern | Rule tests implemented; player comprehension untested |
 | Progression | Players identify the new coil on the character and use its mechanic successfully | Gear meshes and before/after UI implemented |
 | Agency | Relay exploration changes the opening of the boss fight; both endings persist | Rules covered by tests |
-| Reliability | Full phone/desktop journey, reload during combat, ending resume, no page exceptions | Automated journey includes these paths; latest run recorded in RELEASE.md |
+| Reliability | Full phone/desktop journey, reload during combat, ending resume, no page exceptions | Four phone/desktop checks pass; native Simulator startup also passes; exact scope in RELEASE.md |
 | Device quality | Stable frame time, acceptable heat/battery, clean app interruptions on target iPhones | Not measured |
 | Art direction | A consistent character/environment/UI benchmark approved against actual gameplay | Procedural models remain provisional |
 | Release | Signed build, support/privacy URLs, rights review, metadata and TestFlight feedback | Outstanding |

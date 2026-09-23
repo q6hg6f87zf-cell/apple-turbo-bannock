@@ -2,7 +2,7 @@
 
 A fresh start in **apple-turbo-bannock**. This repository contains a new single-player, offline-first opening chapter: walk through Ironclad, meet Tyrone, recover a core, have Travis visibly upgrade your rifle, break the blockade, and choose what happens to Project Vesper's records.
 
-**Status: first playable candidate, not an App Store release.** Build, rules tests, full phone/desktop browser journeys and unsigned iOS Simulator compilation pass. Real-device release verification is tracked in `docs/RELEASE.md`; do not mistake a passing rules test for player validation.
+**Status: first playable candidate, not an App Store release.** Build, 11 rules tests, four phone/desktop browser checks, and unsigned iOS Simulator compilation/startup pass. Real-device release verification is tracked in `docs/RELEASE.md`; do not mistake a passing rules test for player validation.
 
 ## Play and build
 
@@ -16,7 +16,7 @@ npm run check
 
 Tap the ground to walk. Places navigates through the actual street. WASD/arrow keys move relative to the camera. Follow the objective to advance. Combat is turn-based: watch the enemy's intent, guard its heavy shot, and use coil pulse against armour. Defeat returns you to safety with your gear.
 
-`npm run test:browser` exercises the full chapter in Chromium at phone and desktop sizes after `npm run build` and `npx playwright install chromium`. CI also compiles an unsigned iOS Simulator build.
+`npm run test:browser` exercises the full chapter in Chromium at phone and desktop sizes after `npm run build` and `npx playwright install chromium`. CI also compiles, installs and launches an unsigned iOS Simulator build, capturing the native title screen.
 
 ## iOS
 

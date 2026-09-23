@@ -27,9 +27,19 @@ At commit `e69c8435a751cf03207c06f79788b91e1c830fec`, [Game quality run 35827870
 - Phone street and upgraded-loadout screenshots were inspected. Remaining phone/desktop screenshots are available in the run's browser-evidence artifact.
 - Initial browser runs exposed travel slowing at low frame rates. Movement now consumes the available travel distance across waypoints instead of discarding it at each node.
 
+## Production pass — combat and reliability
+
+At commit `61ccaec099b15094c2c69e2319914ad3fd751a0e`, [run 35829395864](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35829395864) passes the game job:
+
+- 11 rule tests cover chapter completion, gates, recovery, save rejection, boss armour/phases, exposure interrupts, forecast consistency and reconnaissance benefits.
+- Four Chromium checks pass: full chapter and deliberately delayed scene startup, each on phone and desktop. The full journey now reloads during combat, performs the Warden interrupt combo and verifies overdrive before completing and resuming the ending.
+- Phone boss composition inspected after increasing encounter approach distance. Targeting, enemy phase, intent and action forecasts are visible alongside the equipped character.
+- Fixed an early-navigation race by disabling controls until scene construction succeeds; failed scene loading now provides a recoverable error. Resume guidance reflects the saved encounter instead of restarting the introduction.
+- Added CI installation/startup capture of the actual bundled native app. [PR run 35829399116](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35829399116) passed both jobs. The unsigned app installed on an iPhone 17 Pro simulator, launched, stayed running, and rendered its title screen. The native screenshot was inspected. This is a startup smoke check, not a native gameplay or physical-device performance test.
+
 ## Outstanding release gates
 
-- Simulator execution, archive and signed physical-iPhone test. CI compilation does not replace actual device play.
+- Full gameplay and lifecycle validation in Simulator, archive and signed physical-iPhone test. The native startup smoke check does not replace actual device play.
 - Confirm Apple Developer membership, team, bundle ID availability, signing profiles and App Store Connect app record.
 - Test iPhone portrait and landscape, smaller displays, iPad, text enlargement, VoiceOver control navigation, app switch/lock/termination, offline cold launch, low storage, interruptions and repeated save/resume. Full nonvisual spatial exploration is not yet established.
 - Measure frame time, peak memory, download size, device heat and battery on a representative older supported iPhone. Current geometry is batched by material, pixel ratio capped, and render loop stops work in hidden documents; these are implementation choices, not measured performance claims.
