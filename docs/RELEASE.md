@@ -18,10 +18,18 @@
 - Rules tests: full chapter through both endings; progression/upgrade gates; reward idempotency; telegraphed guard; defeat recovery; save validation; all destination paths.
 - Capacitor iOS asset/plugin synchronization.
 
+## CI verified — September 23, 2026
+
+At commit `e69c8435a751cf03207c06f79788b91e1c830fec`, [Game quality run 35827870327](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35827870327) passed both jobs:
+
+- Chromium journeys at 390×844 touch/phone and 1440×900 desktop: enter, navigate, fight, upgrade rifle, equip armour, investigate relay, defeat Warden, choose broadcast ending, inspect loadout, reload and resume. No page exceptions or horizontal overflow in the tested final state. Both journeys passed in 2.3 minutes on the software-rendered runner; this is not a device-performance measurement.
+- Unsigned iOS Simulator compilation on macOS passed. The simulator app was compiled, not launched or played.
+- Phone street and upgraded-loadout screenshots were inspected. Remaining phone/desktop screenshots are available in the run's browser-evidence artifact.
+- Initial browser runs exposed travel slowing at low frame rates. Movement now consumes the available travel distance across waypoints instead of discarding it at each node.
+
 ## Outstanding release gates
 
-- Complete browser visual/interactive tests and inspect the resulting screenshots. Local agent-browser socket startup failed; the remote browser cannot access localhost. CI status is authoritative once it runs.
-- Xcode compilation, simulator run, archive and signed physical-iPhone test. Linux cannot validate the native binary. CI compile alone does not replace actual device play.
+- Simulator execution, archive and signed physical-iPhone test. CI compilation does not replace actual device play.
 - Confirm Apple Developer membership, team, bundle ID availability, signing profiles and App Store Connect app record.
 - Test iPhone portrait and landscape, smaller displays, iPad, text enlargement, VoiceOver control navigation, app switch/lock/termination, offline cold launch, low storage, interruptions and repeated save/resume. Full nonvisual spatial exploration is not yet established.
 - Measure frame time, peak memory, download size, device heat and battery on a representative older supported iPhone. Current geometry is batched by material, pixel ratio capped, and render loop stops work in hidden documents; these are implementation choices, not measured performance claims.
