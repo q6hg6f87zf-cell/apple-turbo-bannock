@@ -173,7 +173,11 @@ export function App() {
     commit({ ...live.current, started: true });
     setEntered(true);
     setNotice(
-      "Tap the street to walk. Follow the gold objective, or choose a destination. Tyrone is waiting.",
+      live.current.battle
+        ? `Encounter resumed. ${intent(live.current.battle)}`
+        : live.current.stage !== "wake"
+          ? `Checkpoint restored. ${objective(live.current).body}`
+          : "Tap the street to walk. Follow the gold objective, or choose a destination. Tyrone is waiting.",
     );
   };
   const travel = (id: SiteId) => {
@@ -403,25 +407,35 @@ export function App() {
             </div>
             <div className="actions">
               <button
-                disabled={busy}
+                disabled={busy || !sceneReady}
                 className="primary"
                 onClick={() => battleAction("strike")}
               >
                 Strike
                 <small>{actionForecast(state, "strike")}</small>
               </button>
-              <button disabled={busy} onClick={() => battleAction("guard")}>
+              <button
+                disabled={busy || !sceneReady}
+                onClick={() => battleAction("guard")}
+              >
                 Guard<small>{actionForecast(state, "guard")}</small>
               </button>
               <button
-                disabled={busy || !state.coil || state.energy < 2}
+                disabled={
+                  busy || !sceneReady || !state.coil || state.energy < 2
+                }
                 onClick={() => battleAction("pulse")}
               >
                 Coil pulse · 2 charge
                 <small>{actionForecast(state, "pulse")}</small>
               </button>
               <button
-                disabled={busy || state.meds === 0 || state.hp === maxHp(state)}
+                disabled={
+                  busy ||
+                  !sceneReady ||
+                  state.meds === 0 ||
+                  state.hp === maxHp(state)
+                }
                 onClick={() => battleAction("heal")}
               >
                 Medkit · {state.meds}
@@ -431,7 +445,7 @@ export function App() {
             <div className="combat-foot">
               <span role="status">{notice}</span>
               <button
-                disabled={busy}
+                disabled={busy || !sceneReady}
                 className="text-button"
                 onClick={() => battleAction("retreat")}
               >

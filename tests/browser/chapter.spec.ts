@@ -60,7 +60,9 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
   const encounter = await page.locator(".combat-heading").innerText();
   await page.reload();
   await page.getByRole("button", { name: "Continue your journey" }).click();
-  await expect(page.locator(".combat-heading")).toHaveText(encounter);
+  await expect(page.locator(".combat-heading")).toHaveText(encounter, {
+    useInnerText: true,
+  });
   await battle(page);
   await expect(
     page.getByRole("heading", { name: "Make it yours" }),
