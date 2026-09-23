@@ -9,3 +9,6 @@ ios/App/Pods/
 ios/App/build/
 **/xcuserdata/
 test-results/
+
+build/
+native-evidence/

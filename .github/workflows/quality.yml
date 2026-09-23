@@ -34,4 +34,11 @@ jobs:
       - run: npm ci
       - run: npm run ios:sync
       - name: Compile for iOS Simulator without signing
-        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Install and launch bundled app in iOS Simulator
+        run: python3 scripts/simulator-smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-evidence
+          path: native-evidence/
