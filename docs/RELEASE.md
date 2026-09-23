@@ -39,7 +39,7 @@ At commit `61ccaec099b15094c2c69e2319914ad3fd751a0e`, [run 35829395864](https://
 
 ### Native CI qualification
 
-The companion push run compiled successfully but timed out during `simctl launch`, while the matching PR run passed startup and rendered the title screen. Logs showed that the runner default compiled with Xcode 16.4 / SDK 18.5. CI now explicitly selects installed Xcode 26 and an iOS 26 runtime; its qualification run must pass before claiming release-toolchain validation. The earlier simulator screenshot remains valid startup evidence, not evidence of repeatable native reliability.
+The companion push run compiled successfully but timed out during `simctl launch`, while the matching PR run passed startup and rendered the title screen. Logs showed that the runner default compiled with Xcode 16.4 / SDK 18.5. CI now explicitly selects installed Xcode 26 and an iOS 26 runtime. Qualification at `2377846386a73177c9148a2472614a085b75115c` passed in [run 35830230107](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35830230107): Xcode 26.3 / SDK 26.2 compilation, install, launch and native title-screen capture on iPhone 17 Pro Simulator. The captured screen was inspected. That run also passed the full game job. The prior launch timeout remains recorded; a successful smoke run does not establish device reliability or eliminate the need for lifecycle/performance testing.
 
 ## Outstanding release gates
 
