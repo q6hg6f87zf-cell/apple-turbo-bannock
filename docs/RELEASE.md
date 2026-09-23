@@ -37,6 +37,10 @@ At commit `61ccaec099b15094c2c69e2319914ad3fd751a0e`, [run 35829395864](https://
 - Fixed an early-navigation race by disabling controls until scene construction succeeds; failed scene loading now provides a recoverable error. Resume guidance reflects the saved encounter instead of restarting the introduction.
 - Added CI installation/startup capture of the actual bundled native app. [PR run 35829399116](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35829399116) passed both jobs. The unsigned app installed on an iPhone 17 Pro simulator, launched, stayed running, and rendered its title screen. The native screenshot was inspected. This is a startup smoke check, not a native gameplay or physical-device performance test.
 
+### Native CI qualification
+
+The companion push run compiled successfully but timed out during `simctl launch`, while the matching PR run passed startup and rendered the title screen. Logs showed that the runner default compiled with Xcode 16.4 / SDK 18.5. CI now explicitly selects installed Xcode 26 and an iOS 26 runtime; its qualification run must pass before claiming release-toolchain validation. The earlier simulator screenshot remains valid startup evidence, not evidence of repeatable native reliability.
+
 ## Outstanding release gates
 
 - Full gameplay and lifecycle validation in Simulator, archive and signed physical-iPhone test. The native startup smoke check does not replace actual device play.

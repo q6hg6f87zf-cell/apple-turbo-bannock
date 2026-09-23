@@ -25,8 +25,11 @@ jobs:
           path: test-results/
   ios:
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Select release-compatible Xcode 26
+        run: python3 scripts/select-xcode.py
       - uses: actions/setup-node@v4
         with:
           node-version: 22

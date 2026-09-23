@@ -7,15 +7,20 @@ import time
 
 
 def run(*args, timeout=180):
+    print("Running: " + " ".join(args), flush=True)
     return subprocess.check_output(args, text=True, timeout=timeout).strip()
 
 
+runtimes = json.loads(run("xcrun", "simctl", "list", "runtimes", "--json"))["runtimes"]
+compatible = {r["identifier"] for r in runtimes if r["isAvailable"] and r["version"].startswith("26.") and "iOS" in r["identifier"]}
+if not compatible:
+    raise RuntimeError("No available iOS 26 simulator runtime for the selected release SDK")
 devices = json.loads(run("xcrun", "simctl", "list", "devices", "available", "--json"))["devices"]
 phone = next(
     device
     for runtime in sorted(devices, reverse=True)
     for device in devices[runtime]
-    if "iOS" in runtime and device["name"].startswith("iPhone") and device["isAvailable"]
+    if runtime in compatible and device["name"].startswith("iPhone") and device["isAvailable"]
 )
 udid = phone["udid"]
 print(f"Native smoke device: {phone['name']} ({udid})", flush=True)
