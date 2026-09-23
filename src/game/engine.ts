@@ -61,10 +61,106 @@ export const maxHp = (s: Save) => 30 + (level(s) - 1) * 4;
 export const damage = (s: Save) => 6 + (s.coil ? 2 : 0) + (level(s) - 1);
 export const enemyName = (b: Battle) =>
   b.enemy === "scout" ? "Rail Cut sentry" : "Gate Warden";
-export const intent = (b: Battle) =>
-  b.turn % 2 === 0
-    ? "Charging a heavy shot. Attack or recover."
-    : `Heavy shot incoming: ${b.enemy === "warden" ? 12 : 9} damage. Guard to absorb it.`;
+export type EnemyTurn = {
+  name: string;
+  phase: string;
+  incoming: number;
+  armour: number;
+  vulnerable: boolean;
+  heavy: boolean;
+  hint: string;
+};
+/** One source of truth for telegraphs, damage rules and action forecasts. */
+export function enemyTurn(b: Battle): EnemyTurn {
+  if (b.enemy === "scout")
+    return {
+      name: b.turn % 2 ? "Heavy shot" : "Charging",
+      phase: "RAIL CUT SENTRY",
+      incoming: b.turn % 2 ? 9 : 0,
+      armour: 0,
+      vulnerable: false,
+      heavy: b.turn % 2 === 1,
+      hint:
+        b.turn % 2
+          ? "Guard absorbs 8. Finish the sentry to stop its shot."
+          : "A safe opening to attack or recover.",
+    };
+  const damaged = b.hp <= b.maxHp / 2;
+  const phase = damaged ? "PHASE 02 / OVERDRIVE" : "PHASE 01 / LOCKDOWN";
+  switch (b.turn % 4) {
+    case 0:
+      return {
+        name: damaged ? "Suppression burst" : "Armoured advance",
+        phase,
+        incoming: damaged ? 6 : 4,
+        armour: 6,
+        vulnerable: false,
+        heavy: false,
+        hint: "Guard the burst or pulse through the reinforced armour.",
+      };
+    case 1:
+      return {
+        name: "Cannon wind-up",
+        phase,
+        incoming: 0,
+        armour: 3,
+        vulnerable: false,
+        heavy: false,
+        hint: "Prime the target with a pulse. A second pulse can interrupt the heavy shot.",
+      };
+    case 2:
+      return {
+        name: "Heavy shot",
+        phase,
+        incoming: damaged ? 16 : 14,
+        armour: 3,
+        vulnerable: false,
+        heavy: true,
+        hint: b.exposed
+          ? "Exposed: pulse again to interrupt the cannon, or guard."
+          : "Guard now. An exposed target can be interrupted with a pulse.",
+      };
+    default:
+      return {
+        name: "Cooling vents open",
+        phase,
+        incoming: 0,
+        armour: 0,
+        vulnerable: true,
+        heavy: false,
+        hint: "Strike the open vents for +4 damage, or recover before the next cycle.",
+      };
+  }
+}
+export const intent = (b: Battle) => {
+  const turn = enemyTurn(b);
+  return `${turn.name}${turn.incoming ? ` — ${turn.incoming} damage incoming.` : "."} ${turn.hint}`;
+};
+export function strikeDamage(s: Save): number {
+  const turn = s.battle ? enemyTurn(s.battle) : null;
+  return (
+    Math.max(1, damage(s) - (turn?.armour ?? 0)) +
+    (s.battle?.exposed ? 4 : 0) +
+    (turn?.vulnerable ? 4 : 0)
+  );
+}
+export function actionForecast(s: Save, action: Action): string {
+  if (!s.battle) return "";
+  if (action === "pulse" && (!s.coil || s.energy < 2))
+    return s.coil ? "Needs 2 charge" : "Fit a coil to unlock";
+  if (action === "heal" && (!s.meds || s.hp === maxHp(s)))
+    return s.meds ? "Health full" : "No medkits";
+  const out = act(s, action);
+  if (out.kind === "defeat") return "Lethal response · returns you to safety";
+  if (out.kind === "win") return `${out.damage} damage · finishes encounter`;
+  const hit =
+    action === "heal"
+      ? `Heal ${Math.min(16, maxHp(s) - s.hp)}`
+      : action === "guard"
+        ? "Block 8 · +2 charge"
+        : `${out.damage} damage`;
+  return `${hit} · ${out.incoming ? `take ${out.incoming}` : "no damage taken"}`;
+}
 export function objective(s: Save): {
   title: string;
   body: string;
@@ -201,7 +297,7 @@ export function interact(input: Save, id: SiteId): Outcome {
     );
     return result(
       s,
-      "PROJECT VESPER. These aren’t machinery manifests. They’re names. Evidence recovered · +20 XP · +2 scrap.",
+      "PROJECT VESPER. These aren’t machinery manifests. They’re names. Evidence recovered · +20 XP · +2 scrap. Its firing schematics reveal a weak point: start the Warden encounter with 4 charge and an exposed target.",
       "win",
     );
   }
@@ -214,7 +310,8 @@ export function interact(input: Save, id: SiteId): Outcome {
         "That armour will turn your rounds. Have Travis fit the power core first.",
       );
     s.battle = { enemy: "warden", hp: 46, maxHp: 46, turn: 0, exposed: false };
-    s.energy = 3;
+    s.energy = s.relay ? 4 : 3;
+    if (s.relay) s.battle.exposed = true;
     return result(
       s,
       "The Warden locks onto you. Coil pulse bypasses armour and exposes the target for your next strike.",
@@ -300,13 +397,13 @@ export function act(input: Save, action: Action): Outcome {
       s,
       s.meds < 1 ? "No medkits left." : "Health is already full.",
     );
+  const turn = enemyTurn(b);
+  const interrupted = action === "pulse" && b.exposed && turn.heavy;
   let dealt = 0,
     absorbed = 0,
     text = "";
   if (action === "strike") {
-    dealt =
-      Math.max(1, damage(s) - (b.enemy === "warden" ? 3 : 0)) +
-      (b.exposed ? 4 : 0);
+    dealt = strikeDamage(s);
     b.exposed = false;
     s.energy = Math.min(4, s.energy + 1);
     text = `Strike hits for ${dealt}. +1 charge.`;
@@ -314,8 +411,10 @@ export function act(input: Save, action: Action): Outcome {
   if (action === "pulse") {
     dealt = 12;
     s.energy -= 2;
-    b.exposed = true;
-    text = "Coil pulse hits for 12. Armour bypassed. Next strike +4 damage.";
+    b.exposed = !interrupted;
+    text = interrupted
+      ? "CANNON INTERRUPTED. Coil pulse hits for 12. The heavy shot is cancelled."
+      : "Coil pulse hits for 12. Armour bypassed. Target exposed: next strike +4, or pulse during a heavy shot to interrupt.";
   }
   if (action === "guard") {
     absorbed = 8;
@@ -342,7 +441,7 @@ export function act(input: Save, action: Action): Outcome {
     note(s, text);
     return result(s, text, "win", { damage: dealt, incoming: 0 });
   }
-  const raw = b.turn % 2 === 0 ? 0 : b.enemy === "warden" ? 12 : 9;
+  const raw = interrupted ? 0 : turn.incoming;
   const incoming = Math.max(0, raw - absorbed - (s.armour ? 2 : 0));
   s.hp = Math.max(0, s.hp - incoming);
   b.turn++;
@@ -350,7 +449,9 @@ export function act(input: Save, action: Action): Outcome {
     ? ` You take ${incoming} damage.`
     : raw
       ? " The shot is absorbed."
-      : " The enemy charges its next shot.";
+      : interrupted
+        ? " The cannon falls silent."
+        : " You used the opening safely.";
   if (s.hp === 0) {
     s.hp = maxHp(s);
     s.position = { x: 0, z: 12 };
@@ -411,7 +512,7 @@ export function parseSave(raw: string | null): Save | null {
     )
       return null;
     for (const k of ["hp", "xp", "scrap", "meds", "energy"] as const)
-      if (!Number.isFinite(s[k]) || s[k] < 0 || s[k] > 100000) return null;
+      if (!Number.isInteger(s[k]) || s[k] < 0 || s[k] > 100000) return null;
     for (const k of [
       "started",
       "core",
@@ -436,7 +537,17 @@ export function parseSave(raw: string | null): Save | null {
       return null;
     if (s.ending !== null && s.ending !== "broadcast" && s.ending !== "conceal")
       return null;
-    if (s.hp > maxHp(s) || s.energy > 4) return null;
+    if (s.hp <= 0 || s.hp > maxHp(s) || s.energy > 4) return null;
+    if (
+      s.battle !== null &&
+      (typeof s.battle !== "object" || Array.isArray(s.battle))
+    )
+      return null;
+    if (s.core && s.coil) return null;
+    if (s.stage === "forge" && !s.core) return null;
+    if (["wake", "patrol"].includes(s.stage) && (s.core || s.coil || s.relay))
+      return null;
+    if (s.stage !== "complete" && s.ending !== null) return null;
     if (["gate", "decision", "complete"].includes(s.stage) && !s.coil)
       return null;
     if (s.stage === "complete" && !s.ending) return null;
@@ -447,7 +558,7 @@ export function parseSave(raw: string | null): Save | null {
         !Number.isInteger(b.turn) ||
         b.turn < 0 ||
         typeof b.exposed !== "boolean" ||
-        !Number.isFinite(b.hp) ||
+        !Number.isInteger(b.hp) ||
         b.hp <= 0 ||
         b.hp > b.maxHp ||
         b.maxHp !== (b.enemy === "warden" ? 46 : 24)

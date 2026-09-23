@@ -8,7 +8,9 @@ The player should see a place, act inside it, earn a specific improvement, and d
 - Tap travel, camera-relative keyboard movement, and a following single-wheel Tyrone.
 - Five explicit chapter stages. Story completion requires the actual action, not a generic intel threshold.
 - A supply cache, signal relay, sentry encounter, workshop, armoured Warden and ending choice.
-- Strike / guard / medkit / coil pulse; visible enemy intent and resource costs.
+- Strike / guard / medkit / coil pulse with action forecasts. The sentry teaches guarding; the Warden alternates armoured advances, cannon wind-up, heavy fire and vulnerable vents. Below half health it enters overdrive. Priming then pulsing during heavy fire interrupts the shot.
+- Relay reconnaissance grants a fully charged, exposed-target boss opening. Optional exploration changes the encounter.
+- Visible rank progress, workshop before/after stats, targeting ring, damage callouts and recoil feedback. Reduced-motion settings suppress recoil and floating movement.
 - Rifle coil geometry and shoulder plates appear on the player when equipped. An inspect view mirrors that state.
 - Two saved endings. Broadcasting changes the street lamps to blue; concealment leaves them unchanged. The chapter ends explicitly, with no fake next chapter button.
 - Local checkpoint saves, corrupt-save fallback, optional sound/haptics and reduced motion.

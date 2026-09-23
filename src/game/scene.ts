@@ -8,7 +8,7 @@ import {
   type Point,
   type SiteId,
 } from "./world";
-import { objective, type Save, type Outcome } from "./engine";
+import { objective, enemyTurn, type Save, type Outcome } from "./engine";
 
 export class IroncladScene {
   private renderer: T.WebGLRenderer;
@@ -33,6 +33,19 @@ export class IroncladScene {
   private state: Save;
   private paused = false;
   private attackTime = 0;
+  private hitTime = 0;
+  private struckEnemy: T.Group | null = null;
+  private labels: { sprite: T.Sprite; life: number }[] = [];
+  private enemyRing = new T.Mesh(
+    new T.RingGeometry(0.7, 0.78, 32),
+    new T.MeshBasicMaterial({
+      color: "#e8bb78",
+      side: T.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+    }),
+  );
   private beam: T.Mesh;
   private ring: T.Mesh;
   private moving = false;
@@ -118,6 +131,9 @@ export class IroncladScene {
     this.ring.position.y = 0.04;
     this.ring.visible = false;
     this.scene.add(this.ring);
+    this.enemyRing.rotation.x = -Math.PI / 2;
+    this.enemyRing.visible = false;
+    this.scene.add(this.enemyRing);
     this.focus.copy(this.player.position);
     this.update(state);
     this.observer = new ResizeObserver(() => this.resize());
@@ -416,7 +432,15 @@ export class IroncladScene {
       this.player.position.set(s.position.x, 0, s.position.z);
       this.focus.copy(this.player.position);
     }
+    this.enemyRing.visible = !!s.battle;
     if (s.battle) {
+      const telegraph = enemyTurn(s.battle);
+      const target = this.enemies.get(s.battle.enemy)!;
+      this.enemyRing.position.set(target.position.x, 0.09, target.position.z);
+      this.enemyRing.scale.setScalar(s.battle.enemy === "warden" ? 1.5 : 1);
+      this.enemyRing.material.color.set(
+        telegraph.incoming ? "#fa8268" : "#79e6cf",
+      );
       this.path = [];
       this.destination = null;
       const e = this.enemies.get(s.battle.enemy)!;
@@ -444,13 +468,39 @@ export class IroncladScene {
       this.arrive({ x: this.player.position.x, z: this.player.position.z }, id);
     }
   }
+  private floatText(text: string, at: T.Vector3, color: string) {
+    const sprite = this.label(text, color, 3.8);
+    sprite.position.copy(at);
+    sprite.position.y += 2.8;
+    this.scene.add(sprite);
+    this.labels.push({ sprite, life: 1.4 });
+  }
   flash(out: Outcome) {
+    this.hitTime = 0.32;
+    if (out.incoming)
+      this.floatText(
+        `−${out.incoming} HEALTH`,
+        this.player.position,
+        "#ffa38b",
+      );
+    else if (out.kind === "guard")
+      this.floatText("BRACED", this.player.position, "#dce6bb");
+    if (out.kind === "upgrade")
+      this.floatText("GEAR UPGRADED", this.player.position, "#8ff1d4");
+    if (out.kind === "heal")
+      this.floatText("MEDKIT", this.player.position, "#8ff1d4");
     if (out.damage) {
       this.attackTime = 0.32;
       const e = this.enemies.get(
         this.state.battle?.enemy ??
           (this.state.stage === "decision" ? "warden" : "scout"),
       )!;
+      this.struckEnemy = e;
+      this.floatText(
+        `−${out.damage}${out.text.includes("INTERRUPTED") ? " / INTERRUPTED" : ""}`,
+        e.position,
+        "#f1cc8b",
+      );
       this.temp.copy(this.player.position).add(new T.Vector3(0.2, 1, 0));
       this.aim.copy(e.position).add(new T.Vector3(0, 1, 0));
       this.beam.position.copy(this.temp).lerp(this.aim, 0.5);
@@ -645,6 +695,24 @@ export class IroncladScene {
     if (!this.reduced)
       for (const m of this.markers.values())
         m.children[0].rotation.y = this.time * 0.8;
+    for (let i = this.labels.length - 1; i >= 0; i--) {
+      const label = this.labels[i];
+      label.life -= dt;
+      if (!this.reduced) label.sprite.position.y += dt * 0.6;
+      label.sprite.material.opacity = Math.min(1, Math.max(0, label.life * 2));
+      if (label.life <= 0) {
+        this.scene.remove(label.sprite);
+        label.sprite.material.map?.dispose();
+        label.sprite.material.dispose();
+        this.labels.splice(i, 1);
+      }
+    }
+    this.hitTime = Math.max(0, this.hitTime - dt);
+    if (this.struckEnemy)
+      this.struckEnemy.rotation.z = !this.reduced
+        ? Math.sin(this.hitTime * 25) * this.hitTime * 0.3
+        : 0;
+    this.gun.position.z = !this.reduced ? -this.hitTime * 0.16 : 0;
     this.attackTime = Math.max(0, this.attackTime - dt);
     this.beam.visible = this.attackTime > 0;
     this.renderer.render(this.scene, this.camera);

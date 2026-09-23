@@ -8,6 +8,9 @@ import {
   chooseEnding,
   parseSave,
   maxHp,
+  enemyTurn,
+  actionForecast,
+  strikeDamage,
   type Save,
 } from "../src/game/engine";
 import { SITES, findPath, walkable, type SiteId } from "../src/game/world";
@@ -19,7 +22,7 @@ function win(s: Save) {
   for (let i = 0; s.battle && i < 40; i++) {
     s = act(
       s,
-      s.battle.turn % 2
+      enemyTurn(s.battle).incoming
         ? "guard"
         : s.coil && s.energy >= 2
           ? "pulse"
@@ -77,7 +80,7 @@ test("defeat returns to safety and retains equipment; combat save resumes", () =
   s.stage = "gate";
   s = interact(at(s, "warden"), "warden").state;
   s.hp = 1;
-  s.battle!.turn = 1;
+  s.battle!.turn = 2;
   s = act(s, "strike").state;
   assert.equal(s.battle, null);
   assert.equal(s.hp, maxHp(s));
@@ -108,4 +111,75 @@ test("every destination is reachable and paths never cross buildings", () => {
       if (a.id !== b.id) assert.ok(path.length, `${a.id} -> ${b.id}`);
       for (const point of path) assert.ok(walkable(point));
     }
+});
+
+function boss(): Save {
+  let s = chapter();
+  s.stage = "gate";
+  return interact(at(s, "warden"), "warden").state;
+}
+test("Warden phases use declared armour, incoming damage and vent openings", () => {
+  const s = boss();
+  s.battle!.exposed = false;
+  assert.equal(enemyTurn(s.battle!).armour, 6);
+  assert.equal(act(s, "strike").damage, strikeDamage(s));
+  s.battle!.turn = 2;
+  assert.equal(act(s, "guard").incoming, 4); // 14 - 8 guard - 2 armour
+  s.battle!.hp = 23;
+  assert.equal(enemyTurn(s.battle!).incoming, 16);
+  assert.equal(act(s, "guard").incoming, 6);
+  s.battle!.turn = 3;
+  assert.equal(enemyTurn(s.battle!).armour, 0);
+  assert.equal(strikeDamage(s), 14);
+  assert.equal(act(s, "strike").incoming, 0);
+});
+test("priming then pulsing interrupts the heavy cannon; blind pulse does not", () => {
+  const s = boss();
+  s.battle!.turn = 1;
+  s.battle!.exposed = false;
+  s.energy = 4;
+  const primed = act(s, "pulse").state;
+  assert.equal(primed.battle!.turn, 2);
+  const interrupted = act(primed, "pulse");
+  assert.equal(interrupted.incoming, 0);
+  assert.equal(interrupted.state.battle!.exposed, false);
+  assert.match(interrupted.text, /INTERRUPTED/);
+  primed.battle!.exposed = false;
+  assert.equal(act(primed, "pulse").incoming, 12);
+});
+test("forecasts match resolution without mutating saves; finishing blows stop retaliation", () => {
+  const s = boss();
+  s.battle!.turn = 2;
+  s.battle!.exposed = false;
+  const before = JSON.stringify(s);
+  assert.match(actionForecast(s, "guard"), /take 4/);
+  assert.equal(JSON.stringify(s), before);
+  s.battle!.hp = 1;
+  assert.match(actionForecast(s, "strike"), /finishes encounter/);
+  assert.equal(act(s, "strike").incoming, 0);
+});
+test("relay reconnaissance changes the boss opening without repeat rewards", () => {
+  const informed = boss();
+  assert.equal(informed.energy, 4);
+  assert.equal(informed.battle!.exposed, true);
+  const uninformed = interact(
+    at({ ...informed, relay: false, battle: null }, "warden"),
+    "warden",
+  ).state;
+  assert.equal(uninformed.energy, 3);
+  assert.equal(uninformed.battle!.exposed, false);
+});
+test("save parser rejects fractional inventories and impossible progression", () => {
+  for (const delta of [
+    { meds: 1.5 },
+    { energy: 0.5 },
+    { hp: 0 },
+    { battle: false },
+    { battle: [] },
+    { stage: "forge" },
+    { ending: "broadcast" },
+    { core: true, coil: true },
+  ]) {
+    assert.equal(parseSave(JSON.stringify({ ...initial(), ...delta })), null);
+  }
 });

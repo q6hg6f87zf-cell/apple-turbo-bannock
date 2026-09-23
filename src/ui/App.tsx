@@ -12,6 +12,8 @@ import {
   damage,
   enemyName,
   intent,
+  enemyTurn,
+  actionForecast,
   type Save,
   type Outcome,
   type Action,
@@ -189,6 +191,9 @@ export function App() {
   };
   const obj = objective(state),
     b = state.battle;
+  const telegraph = b ? enemyTurn(b) : null;
+  const rankFloor = level(state) === 3 ? 150 : level(state) === 2 ? 60 : 0;
+  const rankCeiling = level(state) === 3 ? 150 : level(state) === 2 ? 150 : 60;
   const close = () => {
     setPanel(null);
     setConfirmReset(false);
@@ -282,6 +287,25 @@ export function App() {
           {state.scrap} scrap <span>·</span> {state.meds} medkits <span>·</span>{" "}
           {state.xp} XP
         </p>
+        <div
+          className="xp-track"
+          role="progressbar"
+          aria-label="Rank progress"
+          aria-valuemin={rankFloor}
+          aria-valuemax={rankCeiling}
+          aria-valuenow={Math.min(state.xp, rankCeiling)}
+        >
+          <i
+            style={{
+              width: `${level(state) === 3 ? 100 : ((state.xp - rankFloor) / (rankCeiling - rankFloor)) * 100}%`,
+            }}
+          />
+        </div>
+        <span className="rank-progress">
+          {level(state) === 3
+            ? "CHAPTER RANK COMPLETE"
+            : `${rankCeiling - state.xp} XP TO RANK ${level(state) + 1}`}
+        </span>
       </section>
       {!b ? (
         <aside className="objective">
@@ -323,7 +347,9 @@ export function App() {
           <section className="combat" aria-label="Combat">
             <div className="combat-heading">
               <div>
-                <p className="eyebrow">CONTACT / TURN {b.turn + 1}</p>
+                <p className="eyebrow">
+                  {telegraph?.phase} · TURN {b.turn + 1}
+                </p>
                 <h2>{enemyName(b)}</h2>
               </div>
               <strong>
@@ -334,8 +360,8 @@ export function App() {
             <div className="bar enemy-bar">
               <i style={{ width: `${(b.hp / b.maxHp) * 100}%` }} />
             </div>
-            <p className={`intent ${b.turn % 2 ? "danger" : ""}`}>
-              {b.turn % 2 ? "⚠" : "◈"} {intent(b)}
+            <p className={`intent ${telegraph?.incoming ? "danger" : ""}`}>
+              {telegraph?.incoming ? "⚠" : "◈"} {intent(b)}
             </p>
             <div className="combat-stats">
               <span>
@@ -349,7 +375,9 @@ export function App() {
                 {b.exposed
                   ? "EXPOSED · NEXT STRIKE +4"
                   : b.enemy === "warden"
-                    ? "ARMOUR · −3 STRIKE DAMAGE"
+                    ? telegraph?.vulnerable
+                      ? "VENTS OPEN · STRIKE +4"
+                      : `ARMOUR · −${telegraph?.armour} STRIKE`
                     : "UNARMOURED"}
               </span>
             </div>
@@ -360,29 +388,24 @@ export function App() {
                 onClick={() => battleAction("strike")}
               >
                 Strike
-                <small>
-                  {Math.max(1, damage(state) - (b.enemy === "warden" ? 3 : 0)) +
-                    (b.exposed ? 4 : 0)}{" "}
-                  damage · +1 charge
-                </small>
+                <small>{actionForecast(state, "strike")}</small>
               </button>
               <button disabled={busy} onClick={() => battleAction("guard")}>
-                Guard<small>Block 8 · +2 charge</small>
+                Guard<small>{actionForecast(state, "guard")}</small>
               </button>
               <button
                 disabled={busy || !state.coil || state.energy < 2}
                 onClick={() => battleAction("pulse")}
               >
-                Coil pulse
-                <small>
-                  {state.coil ? "12 damage · 2 charge" : "Fit a coil to unlock"}
-                </small>
+                Coil pulse · 2 charge
+                <small>{actionForecast(state, "pulse")}</small>
               </button>
               <button
                 disabled={busy || state.meds === 0 || state.hp === maxHp(state)}
                 onClick={() => battleAction("heal")}
               >
-                Medkit<small>Heal 16 · {state.meds} left</small>
+                Medkit · {state.meds}
+                <small>{actionForecast(state, "heal")}</small>
               </button>
             </div>
             <div className="combat-foot">
@@ -628,6 +651,33 @@ export function App() {
               {panel === "workshop" ? (
                 <>
                   <Gear coil={state.coil} armour={state.armour} />
+                  {!state.coil && state.core ? (
+                    <div
+                      className="upgrade-preview"
+                      aria-label="Upgrade comparison"
+                    >
+                      <p className="eyebrow">IRONBOUND COIL / BEFORE → AFTER</p>
+                      <p>
+                        Strike{" "}
+                        <strong>
+                          {damage(state)} →{" "}
+                          {damage(upgrade(state, "coil").state)}
+                        </strong>{" "}
+                        · includes rank gain
+                      </p>
+                      <p>
+                        Pulse <strong>Locked → 12 damage</strong>
+                      </p>
+                      <p>
+                        Armour bypass, exposed targets and cannon interrupts.
+                        Health restored on fitting.
+                      </p>
+                      <details>
+                        <summary>Inspect the fitted coil</summary>
+                        <Gear coil armour={state.armour} />
+                      </details>
+                    </div>
+                  ) : null}
                   <button
                     className="primary"
                     disabled={!state.core || state.coil}

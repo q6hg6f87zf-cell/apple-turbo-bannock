@@ -56,6 +56,11 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
   await expect(
     page.getByRole("region", { name: "Combat", exact: true }),
   ).toBeVisible({ timeout: 15000 });
+  // Reload during an encounter: the exact turn and enemy health must survive.
+  const encounter = await page.locator(".combat-heading").innerText();
+  await page.reload();
+  await page.getByRole("button", { name: "Continue your journey" }).click();
+  await expect(page.locator(".combat-heading")).toHaveText(encounter);
   await battle(page);
   await expect(
     page.getByRole("heading", { name: "Make it yours" }),
@@ -80,9 +85,20 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
   await expect(
     page.getByRole("region", { name: "Combat", exact: true }),
   ).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(".combat-heading")).toContainText("LOCKDOWN");
   await page.screenshot({
     path: `test-results/${info.project.name}-combat.png`,
   });
+  if (info.project.name === "phone") await visualEvidence(page, "combat");
+  await page.getByRole("button", { name: /^Coil pulse/ }).click();
+  await expect(page.locator(".intent")).toContainText("Cannon wind-up");
+  await page.getByRole("button", { name: /^Guard/ }).click();
+  await expect(page.locator(".intent")).toContainText("Heavy shot");
+  await page.getByRole("button", { name: /^Coil pulse/ }).click();
+  await expect(page.locator(".combat-foot")).toContainText(
+    "CANNON INTERRUPTED",
+  );
+  await expect(page.locator(".combat-heading")).toContainText("OVERDRIVE");
   await battle(page);
   await page.getByRole("button", { name: "Continue journey" }).click();
   await expect(
@@ -102,6 +118,7 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
   });
   if (info.project.name === "phone") await visualEvidence(page, "loadout");
   await dismiss(page);
+  // The installed app bundles these resources. A web browser still requires its host.
   await page.reload();
   await page.getByRole("button", { name: "Continue your journey" }).click();
   await expect(

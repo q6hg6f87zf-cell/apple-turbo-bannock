@@ -967,3 +967,48 @@ details p {
     display: none;
   }
 }
+
+.xp-track {
+  height: 3px;
+  background: #77867735;
+  margin-top: 9px;
+  overflow: hidden;
+}
+.xp-track i {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  transition: width 0.4s;
+}
+.rank-progress {
+  display: block;
+  color: var(--gold);
+  font-size: 8px;
+  letter-spacing: 1px;
+  margin-top: 5px;
+}
+.upgrade-preview {
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #e8bb7845;
+  background: #28382d;
+}
+.upgrade-preview p {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.upgrade-preview strong {
+  color: var(--gold);
+}
+.upgrade-preview details {
+  margin-bottom: 0;
+}
+.combat {
+  max-height: 59dvh;
+  overflow-y: auto;
+}
+@media (max-width: 700px) {
+  .objective {
+    top: 225px;
+  }
+}
