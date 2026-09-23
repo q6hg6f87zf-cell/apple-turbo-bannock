@@ -142,3 +142,31 @@ test.afterEach(async ({ page }, info) => {
     );
   }
 });
+
+test("travel waits for scene loading instead of losing the first tap", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/scene-*.js", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Enter Ironclad" }).click();
+  try {
+    await expect(
+      page.getByRole("button", { name: "Continue journey" }),
+    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Places/ })).toBeDisabled();
+  } finally {
+    release();
+  }
+  await expect(
+    page.getByRole("button", { name: "Continue journey" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Continue journey" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+});

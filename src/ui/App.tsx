@@ -33,7 +33,8 @@ type Panel = "gear" | "journal" | "settings" | "destinations" | SiteId | null;
 export function App() {
   const [state, setState] = useState<Save>(initial),
     [ready, setReady] = useState(false),
-    [entered, setEntered] = useState(false);
+    [entered, setEntered] = useState(false),
+    [sceneReady, setSceneReady] = useState(false);
   const [panel, setPanel] = useState<Panel>(null),
     [notice, setNotice] = useState(""),
     [warning, setWarning] = useState(""),
@@ -85,30 +86,38 @@ export function App() {
   useEffect(() => {
     if (!entered || !host.current) return;
     let disposed = false;
-    void import("../game/scene").then(({ IroncladScene }) => {
-      if (disposed || !host.current) return;
-      try {
-        scene.current = new IroncladScene(
-          host.current,
-          live.current,
-          (position: Point, id: SiteId | null) => {
-            setTravelling("");
-            const s = { ...live.current, position };
-            commit(s);
-            if (id) {
-              const out = interact(s, id);
-              apply(out);
-              if (!out.state.battle) setPanel(id);
-            }
-          },
-          setGraphicsError,
-        );
-      } catch {
-        setGraphicsError(
-          "This device could not start the 3D scene. Your save is safe. Try reloading with other graphics-heavy apps closed.",
-        );
-      }
-    });
+    void import("../game/scene")
+      .then(({ IroncladScene }) => {
+        if (disposed || !host.current) return;
+        try {
+          scene.current = new IroncladScene(
+            host.current,
+            live.current,
+            (position: Point, id: SiteId | null) => {
+              setTravelling("");
+              const s = { ...live.current, position };
+              commit(s);
+              if (id) {
+                const out = interact(s, id);
+                apply(out);
+                if (!out.state.battle) setPanel(id);
+              }
+            },
+            setGraphicsError,
+          );
+          setSceneReady(true);
+        } catch {
+          setGraphicsError(
+            "This device could not start the 3D scene. Your save is safe. Try reloading with other graphics-heavy apps closed.",
+          );
+        }
+      })
+      .catch(() => {
+        if (!disposed)
+          setGraphicsError(
+            "The game scene could not load. Reload to try again. Your checkpoint is saved.",
+          );
+      });
     return () => {
       disposed = true;
       scene.current?.dispose();
@@ -158,6 +167,8 @@ export function App() {
     };
   }, [commit]);
   const begin = () => {
+    setSceneReady(false);
+    setGraphicsError("");
     unlockSound();
     commit({ ...live.current, started: true });
     setEntered(true);
@@ -166,6 +177,7 @@ export function App() {
     );
   };
   const travel = (id: SiteId) => {
+    if (!scene.current || !sceneReady) return;
     setPanel(null);
     setTravelling(SITES.find((s) => s.id === id)!.name);
     scene.current?.setPaused(false);
@@ -247,7 +259,7 @@ export function App() {
     <main
       className={`game ${state.settings.reducedMotion ? "reduce-motion" : ""}`}
     >
-      <div className="world" ref={host} />
+      <div className="world" ref={host} aria-busy={!sceneReady} />
       <div className="vignette" />
       <header className="hud-top">
         <div className="identity">
@@ -262,6 +274,7 @@ export function App() {
         <button
           className="icon-button"
           aria-label="Settings and pause"
+          disabled={!sceneReady}
           onClick={() => open("settings")}
         >
           Ⅱ
@@ -314,20 +327,27 @@ export function App() {
           </p>
           <h2>{obj.title}</h2>
           <p>{obj.body}</p>
-          <button className="text-button" onClick={() => travel(obj.target)}>
+          <button
+            className="text-button"
+            disabled={!sceneReady}
+            onClick={() => travel(obj.target)}
+          >
             {travelling ? `Walking to ${travelling}…` : "Follow objective"}{" "}
             <span>↗</span>
           </button>
         </aside>
       ) : null}
       <nav className="utility" aria-label="Game menus">
-        <button onClick={() => open("gear")}>
+        <button disabled={!sceneReady} onClick={() => open("gear")}>
           <span>◇</span>Loadout{state.coil ? <i /> : null}
         </button>
-        <button onClick={() => open("journal")}>
+        <button disabled={!sceneReady} onClick={() => open("journal")}>
           <span>≡</span>Journal
         </button>
-        <button disabled={!!b} onClick={() => open("destinations")}>
+        <button
+          disabled={!!b || !sceneReady}
+          onClick={() => open("destinations")}
+        >
           <span>⌖</span>Places
         </button>
       </nav>
@@ -433,7 +453,10 @@ export function App() {
                     : "TYRONE / FIELD CHANNEL"}
                 </p>
                 <p>
-                  {notice || "Keep moving. This town won’t introduce itself."}
+                  {!sceneReady
+                    ? "Opening Ironclad…"
+                    : notice ||
+                      "Keep moving. This town won’t introduce itself."}
                 </p>
               </div>
             </div>
@@ -444,7 +467,7 @@ export function App() {
                   ? `Walking to ${travelling}`
                   : "Tap the street to move"}
               </span>
-              <button onClick={() => travel(obj.target)}>
+              <button disabled={!sceneReady} onClick={() => travel(obj.target)}>
                 {state.stage === "complete"
                   ? "Visit workshop"
                   : "Continue journey"}{" "}
