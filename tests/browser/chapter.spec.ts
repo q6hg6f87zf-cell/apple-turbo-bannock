@@ -1,4 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
+async function visualEvidence(page: Page, name: string) {
+  const shot = await page.screenshot({ type: "jpeg", quality: 60 });
+  console.log(`VISUAL_EVIDENCE:${name}:${shot.toString("base64")}`);
+}
 async function go(page: Page, name: string) {
   await page.getByRole("button", { name: "Places", exact: false }).click();
   await page.getByRole("button", { name: new RegExp(name) }).click();
@@ -31,13 +35,17 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
   page,
 }, info) => {
   const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("pageerror", (e) => {
+    errors.push(e.message);
+    console.log("PAGE ERROR:", e.message);
+  });
   await page.goto("/");
   await page.getByRole("button", { name: "Enter Ironclad" }).click();
   await expect(page.locator("canvas")).toBeVisible();
   await page.screenshot({
     path: `test-results/${info.project.name}-street.png`,
   });
+  if (info.project.name === "phone") await visualEvidence(page, "street");
   await page.getByRole("button", { name: "Continue journey" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await dismiss(page);
@@ -92,6 +100,7 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
   await page.screenshot({
     path: `test-results/${info.project.name}-loadout.png`,
   });
+  if (info.project.name === "phone") await visualEvidence(page, "loadout");
   await dismiss(page);
   await page.reload();
   await page.getByRole("button", { name: "Continue your journey" }).click();
@@ -104,4 +113,15 @@ test("walk, fight, upgrade, equip armour, choose ending and resume", async ({
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) {
+    await visualEvidence(page, info.project.name + "-failure");
+    console.log("GAME DIAGNOSTIC", await page.locator("body").innerText());
+    console.log(
+      "SAVE DIAGNOSTIC",
+      await page.evaluate(() => JSON.stringify(localStorage)),
+    );
+  }
 });

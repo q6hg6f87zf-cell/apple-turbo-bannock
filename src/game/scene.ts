@@ -538,7 +538,7 @@ export class IroncladScene {
   };
   private loop = (now: number) => {
     this.frame = requestAnimationFrame(this.loop);
-    const dt = this.previous ? Math.min((now - this.previous) / 1000, 0.05) : 0;
+    const dt = this.previous ? Math.min((now - this.previous) / 1000, 0.25) : 0;
     this.previous = now;
     if (document.hidden) return;
     this.time += dt;
@@ -575,27 +575,34 @@ export class IroncladScene {
           this.moving = true;
         }
       } else if (this.path.length) {
-        const p = this.path[0],
-          d = Math.hypot(
+        // Consume distance across waypoints so travel speed does not depend on FPS.
+        let remaining = dt * 5;
+        this.moving = true;
+        while (this.path.length && remaining > 0) {
+          const p = this.path[0];
+          const d = Math.hypot(
             p.x - this.player.position.x,
             p.z - this.player.position.z,
-          ),
-          step = dt * 5;
-        this.player.lookAt(p.x, 0, p.z);
-        this.moving = true;
-        if (d <= step) {
-          this.player.position.set(p.x, 0, p.z);
-          this.path.shift();
-          if (!this.path.length) {
-            const id = this.destination;
-            this.destination = null;
-            this.moving = false;
-            this.ring.visible = false;
-            this.arrive({ x: p.x, z: p.z }, id);
+          );
+          this.player.lookAt(p.x, 0, p.z);
+          if (d <= remaining) {
+            this.player.position.set(p.x, 0, p.z);
+            remaining -= d;
+            this.path.shift();
+            if (!this.path.length) {
+              const id = this.destination;
+              this.destination = null;
+              this.moving = false;
+              this.ring.visible = false;
+              this.arrive({ x: p.x, z: p.z }, id);
+            }
+          } else {
+            this.player.position.x +=
+              ((p.x - this.player.position.x) / d) * remaining;
+            this.player.position.z +=
+              ((p.z - this.player.position.z) / d) * remaining;
+            remaining = 0;
           }
-        } else {
-          this.player.position.x += ((p.x - this.player.position.x) / d) * step;
-          this.player.position.z += ((p.z - this.player.position.z) / d) * step;
         }
       } else if (this.moving) {
         this.moving = false;
