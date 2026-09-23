@@ -455,7 +455,8 @@ export class IroncladScene {
   travel(id: SiteId) {
     if (this.state.battle || this.paused) return;
     const site = SITES.find((p) => p.id === id)!;
-    this.moveTo({ x: site.x, z: site.z + 1 }, id);
+    const approach = id === "scout" || id === "warden" ? 2 : 1;
+    this.moveTo({ x: site.x, z: site.z + approach }, id);
   }
   private moveTo(p: Point, id: SiteId | null) {
     if (!walkable(p)) return;
