@@ -172,7 +172,11 @@ export function acquireNamed(
     return false;
   w.history.push(entry);
   w.owner = "player";
-  if (entry.method === "authorized" && d.owner && !w.authorizedBy.includes(d.owner))
+  if (
+    entry.method === "authorized" &&
+    d.owner &&
+    !w.authorizedBy.includes(d.owner)
+  )
     w.authorizedBy.push(d.owner);
   if (["looted", "stolen"].includes(entry.method)) w.authorizedBy = [];
   return true;
@@ -267,3 +271,17 @@ export const carriedLoad = (s: Save) =>
     (n, i) => n + ITEMS[i.definition].load,
     0,
   );
+
+/** Only slotted equipment goes into the field; remaining owned gear stays in stores. */
+export const fieldLoad = (s: Save) =>
+  Array.from(
+    new Set(Object.values(s.loadout).filter((id): id is string => !!id)),
+  ).reduce((n, id) => {
+    const w = s.inventory.weapons[id],
+      i = s.inventory.items[id];
+    return (
+      n + (w ? WEAPONS[w.definition].load : i ? ITEMS[i.definition].load : 0)
+    );
+  }, 0);
+export const loadPenalty = (s: Save) =>
+  Math.min(4, Math.ceil(Math.max(0, fieldLoad(s) - 12) / 2));
