@@ -41,6 +41,17 @@ At commit `61ccaec099b15094c2c69e2319914ad3fd751a0e`, [run 35829395864](https://
 
 The companion push run compiled successfully but timed out during `simctl launch`, while the matching PR run passed startup and rendered the title screen. Logs showed that the runner default compiled with Xcode 16.4 / SDK 18.5. CI now explicitly selects installed Xcode 26 and an iOS 26 runtime. Qualification at `2377846386a73177c9148a2472614a085b75115c` passed in [run 35830230107](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35830230107): Xcode 26.3 / SDK 26.2 compilation, install, launch and native title-screen capture on iPhone 17 Pro Simulator. The captured screen was inspected. That run also passed the full game job. The prior launch timeout remains recorded; a successful smoke run does not establish device reliability or eliminate the need for lifecycle/performance testing.
 
+## Canon foundation qualification — September 24, 2026
+
+Current implementation and CI hardening are qualified at `fd7ebbaa01e99dec6d171b7e1477f018c3212c50` in [run 35954166462](https://github.com/q6hg6f87zf-cell/apple-turbo-bannock/actions/runs/35954166462). Earlier First Light results above are historical, not descriptions of the current story.
+
+- 21 rules/art tests, TypeScript, production build and Capacitor sync pass. All 68 canonical donor image binaries match the offline native bundle.
+- Six Chromium checks pass across phone (390×844) and desktop (1440×900): the Vault 13 / Ironclad journey through negotiated settlement and saved consequences, delayed scene readiness, and damaged-primary backup recovery. Full journeys include combat reload, M94 restoration/upgrades, reconnaissance, Tyrone response, enforcer interruption, vendor consequences and ending resume. No page exceptions, failed asset responses or final horizontal overflow were detected by those journeys. Compact and Ashen alternatives have rules coverage, not complete browser playthrough coverage.
+- Browser evidence is now written to the uploaded artifact even for passing tests. Twelve captures from `bedcbd3` were inspected: Vault, damaged/upgraded M94, combat, consequences and loadout on both viewports. Canonical donor art is visible; procedural world/character/weapon models remain provisional. These are not physical-device or performance results.
+- Xcode 26 compilation and the bundled app's native startup pass on iPhone 17 Pro Simulator. The smoke check now uses macOS Vision to require the rendered Hollow Realm title and Vault 13 entry control. The successful `fd7ebba` screenshot was also inspected visually.
+- `bedcbd3` had green native process checks but a blank screenshot. It is not accepted as visual qualification. The earlier `275e392` capture did show the title. A fixed 15-second capture was replaced by bounded readiness checks with retained screenshots and recognized text. The underlying cause of the intermittent blank capture was not established; this change detects missing UI rather than claiming to repair a native rendering defect. Native gameplay, repeated cold starts and physical-device lifecycle/performance remain outstanding.
+- Browser test fixes use an exact heading selector and inject save corruption before the new document boots, after the departing page's lifecycle checkpoint. Production save behavior was preserved.
+
 ## Outstanding release gates
 
 - Full gameplay and lifecycle validation in Simulator, archive and signed physical-iPhone test. The native startup smoke check does not replace actual device play.
