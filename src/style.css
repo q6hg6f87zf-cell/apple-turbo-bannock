@@ -1169,3 +1169,437 @@ details p {
 .walk-controls button{background:#0e181bcc;font-size:10px;padding:10px;}
 @media(max-width:700px){.walk-controls{left:20px;bottom:340px;}.movement-pad{width:88px;height:88px;}.walk-controls button{max-width:80px;}}
 .harbor-game .panel>.close {position:sticky;top:8px;float:right;right:auto;z-index:5;background:#131a17ee;margin:-20px -10px 0 10px;}
+
+.watch-chip {
+  position: absolute;
+  left: 0;
+  top: 52px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 4px 0;
+  min-height: 24px;
+  border: 0;
+  background: transparent;
+  color: #cbb384;
+}
+.camp-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 26px;
+  clear: both;
+}
+.camp-navigation button {
+  flex: 1;
+  min-width: 105px;
+  background: #a58a4f18;
+  border-color: #b09a6555;
+  font-size: 12px;
+}
+.watch-track {
+  list-style: none;
+  margin: 24px 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+.watch-track li {
+  text-align: center;
+  padding: 12px 2px;
+  font-size: 10px;
+  border-top: 3px solid #9d9e7850;
+  color: #acae9e;
+}
+.watch-track .spent {
+  color: #666f65;
+  border-color: #414b42;
+}
+.watch-track .current {
+  border-color: #e1bd7e;
+  color: #e1bd7e;
+  background: #bb9c5520;
+}
+.work-active,
+.rest-day {
+  padding: 20px;
+  border: 1px solid #d1ae6b55;
+  margin: 24px 0;
+  background: #baa4750a;
+}
+.work-active h3,
+.rest-day h3 {
+  font:
+    24px Georgia,
+    serif;
+  margin: 8px 0;
+}
+.job-actions {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+.job-actions > button {
+  flex: 1;
+  min-width: 120px;
+}
+.work-log {
+  border-top: 1px solid #c4ac6722;
+  padding: 12px 0;
+}
+.casino-intro {
+  font:
+    italic 17px/1.6 Georgia,
+    serif;
+  color: #c7bfab;
+}
+.chip-account {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 0;
+  border-bottom: 1px solid #ccb67955;
+  gap: 15px;
+}
+.chip-account > strong {
+  font:
+    36px Georgia,
+    serif;
+  color: #e1bf7f;
+}
+.chip-account > span {
+  font-size: 11px;
+  color: #b7bda9;
+}
+.casino-games {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 22px 0;
+}
+.casino-games button {
+  padding: 9px 5px;
+  font-size: 11px;
+  min-height: 44px;
+  background: transparent;
+}
+.casino-games [aria-pressed="true"] {
+  background: #bea57125;
+  border-color: #d7ba79;
+  color: #f0d598;
+}
+.casino-table {
+  padding: 22px;
+  background: radial-gradient(ellipse at top, #234333, #11281f 65%);
+  border: 1px solid #a88d554f;
+  border-radius: 7px;
+}
+.casino-table h3 {
+  font:
+    32px Georgia,
+    serif;
+  margin: 10px 0;
+}
+.casino-table > p {
+  font-size: 13px;
+}
+.casino-table .casino-message {
+  padding: 14px 0;
+  color: #e2c68c;
+  border-bottom: 1px solid #dcc28825;
+  margin: 8px 0 20px;
+}
+.card-hand {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.playing-card {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 65px;
+  height: 90px;
+  padding: 8px;
+  background: #eee7d4;
+  border-radius: 5px;
+  color: #162320;
+  box-shadow: 0 3px 6px #0004;
+  flex-shrink: 0;
+  font:
+    25px Georgia,
+    serif;
+}
+.playing-card > span {
+  text-align: right;
+  font-size: 31px;
+}
+.playing-card.red-card {
+  color: #ad3930;
+}
+.playing-card[aria-label="Hidden card"] {
+  background: repeating-linear-gradient(
+    45deg,
+    #71522c,
+    #71522c 3px,
+    #4c3b26 3px,
+    #4c3b26 6px
+  );
+  color: #ddc28c;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #ceb684;
+}
+.player-hand {
+  padding: 12px;
+  border: 1px solid transparent;
+}
+.active-hand {
+  border-color: #d6b37755;
+}
+.player-hand > p {
+  font-size: 12px;
+  color: #d0c5a5;
+}
+.table-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 15px 0;
+}
+.table-actions button {
+  padding: 10px 6px;
+}
+.tyrone-whisper {
+  font:
+    italic 15px/1.5 Georgia,
+    serif;
+  color: #c9d1ba;
+}
+.poker-hand {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 22px 0;
+}
+.poker-hand > button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-width: 0;
+}
+.poker-hand .playing-card {
+  width: 100%;
+  max-width: 65px;
+}
+.poker-hand [aria-pressed="true"] .playing-card {
+  outline: 3px solid #deb765;
+  transform: translateY(-5px);
+}
+.poker-hand small {
+  color: #dbbc7d;
+}
+.deal-controls {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+.deal-controls label,
+.casino form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.casino input:not([type="checkbox"]):not([type="range"]),
+.casino select {
+  background: #13271e;
+  color: #eee6d2;
+  border: 1px solid #c1ab7444;
+  min-height: 44px;
+  padding: 10px;
+  max-width: 100%;
+}
+.casino form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.casino form label {
+  width: 100%;
+}
+.casino .knowledge-question {
+  font:
+    22px/1.5 Georgia,
+    serif;
+}
+.casino .story-choices {
+  margin: 15px 0;
+}
+.casino .story-choices button {
+  background: #133022;
+  text-align: left;
+}
+.letter-rack {
+  font: clamp(18px, 4vw, 30px)/1.4 monospace;
+  color: #f2d399;
+  letter-spacing: 2px;
+  margin: 24px 0;
+  word-break: break-word;
+}
+.search-grid {
+  display: grid;
+  gap: 3px;
+  margin: 18px 0;
+}
+.search-grid button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 0;
+  background: #193628;
+  font: 16px monospace;
+}
+.search-grid [aria-pressed="true"] {
+  outline: 2px solid #d8b572;
+}
+.search-grid .found-cell {
+  background: #687447;
+  color: #fff;
+}
+.word-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.found-word {
+  text-decoration: line-through;
+  color: #b3c47c;
+}
+.hack-words {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 20px 0;
+}
+.hack-words button {
+  font: 15px monospace;
+  color: #b9e4aa;
+  background: #10251b;
+  letter-spacing: 2px;
+}
+.lock-dial {
+  position: relative;
+  height: 44px;
+  background: #091912;
+  border: 1px solid #718a6944;
+  margin: 24px 0;
+}
+.lock-dial i {
+  position: absolute;
+  height: 100%;
+  background: #bfa15a66;
+}
+.lock-dial b {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 3px;
+  background: #f4d49a;
+}
+.slot-faces {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 28px 0;
+}
+.slot-faces span {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+  padding: 24px 4px;
+  background: #eee3ca;
+  color: #433520;
+  font:
+    bold 22px Georgia,
+    serif;
+  border-radius: 5px;
+  box-shadow: inset 0 8px 18px #3b301d30;
+}
+.lesson-cards {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.lesson-cards button {
+  text-align: left;
+  padding: 18px;
+  background: #b6a36a10;
+}
+.lesson-cards strong {
+  font:
+    25px Georgia,
+    serif;
+  color: #dfc68f;
+  display: block;
+}
+.lesson-cards span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .harbor-game .watch-chip {
+    top: 52px;
+    font-size: 9px;
+  }
+  .casino-table {
+    padding: 16px 10px;
+  }
+  .casino-games {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .table-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+  .playing-card {
+    width: 52px;
+    height: 76px;
+    font-size: 22px;
+  }
+  .playing-card > span {
+    font-size: 25px;
+  }
+  .poker-hand {
+    gap: 5px;
+  }
+  .poker-hand .playing-card {
+    font-size: 18px;
+    height: 69px;
+    padding: 5px;
+  }
+  .casino-table h3 {
+    font-size: 27px;
+  }
+  .chip-account > span {
+    max-width: 145px;
+    font-size: 10px;
+  }
+  .casino .knowledge-question {
+    font-size: 20px;
+  }
+  .search-grid {
+    gap: 2px;
+  }
+  .search-grid button {
+    font-size: 14px;
+  }
+  .watch-track li {
+    font-size: 8px;
+  }
+}
