@@ -1,3 +1,4 @@
+import type { LifeState } from "../life-state";
 import type { Point } from "../world";
 export type RegionId =
   "ironclad" | "slagtown" | "blackspire" | "brasswater" | "veyra";
@@ -207,6 +208,7 @@ export type Phase =
   | "complete";
 export type Battle = {
   contractId?: string;
+  workOrder?: { day: number; region: RegionId };
   supportUsed?: boolean;
   enemy: "scout" | "enforcer";
   hp: number;
@@ -217,6 +219,7 @@ export type Battle = {
   weapon: string;
 };
 export interface Save {
+  life: LifeState;
   version: 2;
   started: boolean;
   player: {
