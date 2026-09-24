@@ -1,3 +1,4 @@
+import { contractById } from "../expeditions";
 import { initial, maxHp } from "./state";
 import { WEAPONS, ITEMS } from "./registry";
 import { AMMO_GRADES, type Save } from "./types";
@@ -318,6 +319,13 @@ export function parseSave(raw: string | null): Save | null {
     if (t.chassis === "T-0888") {
       const before = structuredClone(save);
       before.tyrone.chassis = "T-0880";
+      // Trust can fall after an earned rebuild. Validate the recorded event,
+      // not an impossible requirement to rebuild him again on every load.
+      if (
+        save.choices.canon_rebuild === "consent" &&
+        save.world.flags.includes("t0888-rebuild")
+      )
+        before.tyrone.trust = Math.max(3, before.tyrone.trust);
       if (!canRebuildTyrone(before)) return null;
     }
     if (q.chapter === 1) {
@@ -368,6 +376,16 @@ export function parseSave(raw: string | null): Save | null {
         return null;
     }
     const b = s.encounters.active;
+    const contract = b?.contractId ? contractById(b.contractId) : undefined;
+    if (
+      b?.contractId &&
+      (!contract ||
+        contract.region !== p.region ||
+        s.choices["contract:" + b.contractId])
+    )
+      return null;
+    if (b?.supportUsed !== undefined && typeof b.supportUsed !== "boolean")
+      return null;
     if (b !== null) {
       if (
         !record(b) ||
@@ -378,7 +396,7 @@ export function parseSave(raw: string | null): Save | null {
         b.maxHp !== (b.enemy === "scout" ? 24 : 46) ||
         !integer(b.turn) ||
         typeof b.exposed !== "boolean" ||
-        q.phase !== (b.enemy === "scout" ? "rail" : "blockade")
+        (!contract && q.phase !== (b.enemy === "scout" ? "rail" : "blockade"))
       )
         return null;
     }
