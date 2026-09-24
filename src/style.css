@@ -1025,3 +1025,147 @@ details p {
 .panel details { padding:12px 0; border-bottom:1px solid #69716455; }
 .panel summary { cursor:pointer; }
 @media(max-width:600px){ .combat .actions { grid-template-columns:repeat(3,minmax(0,1fr));gap:5px; } .combat .actions button { padding:9px 6px;font-size:12px; } .combat .actions small { font-size:10px;line-height:1.25; } .field-message p:not(.eyebrow) { max-height:80px;overflow:auto; } }
+
+/* Journey shell: the world owns the screen; detailed systems live in the field book. */
+.harbor-game { background:#101211; isolation:isolate; }
+.journey-scene,.journey-backdrop,.scene-shade { position:absolute;inset:0;width:100%;height:100%; }
+.journey-backdrop { object-fit:cover;object-position:center 45%; }
+.scene-shade { background:linear-gradient(180deg,#070b0bd9 0%,transparent 28%,#070b0b15 47%,#070b0bd9 78%,#070b0b 100%),linear-gradient(90deg,#070b0b70,transparent 75%); }
+.scenic-view .world { display:none; }
+.harbor-game .vignette { pointer-events:none; }
+.place-caption { position:absolute;left:6%;top:29%;max-width:70%;color:#f5ebd8;text-shadow:0 3px 30px #000; }
+.place-caption>p { font:clamp(42px,6vw,88px)/1.05 Georgia,serif;letter-spacing:-2px;margin:10px 0 16px; }
+.place-caption>span:last-child { color:#d3cfc0;font:italic 18px Georgia,serif; }
+.harbor-game .hud-top { left:4%;right:4%;top:max(20px,env(safe-area-inset-top)); }
+.harbor-game .identity .sigil { display:none; }
+.harbor-game .identity h1 { font:24px Georgia,serif; }
+.harbor-game .identity h1 span { display:none; }
+.harbor-game .vitals { top:max(25px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:220px;border:0;background:transparent;padding:0;box-shadow:none; }
+.harbor-game .vitals .rank,.harbor-game .vitals .eyebrow,.harbor-game .vitals>p,.harbor-game .xp-track { display:none; }
+.harbor-game .vitals>div>div { width:100%; }
+.harbor-game .rank-progress { font-size:10px;letter-spacing:.2px; }
+.harbor-game .objective { top:auto;bottom:124px;left:5%;width:min(350px,35%);padding:0;border:0;background:transparent;box-shadow:none; }
+.harbor-game .objective h2 { font-size:31px;margin:8px 0; }
+.harbor-game .objective .text-button { display:none; }
+.harbor-game .objective>p:not(.eyebrow) { font-size:13px;max-width:330px; }
+.harbor-game .bottom-hud { bottom:120px;left:auto;right:5%;transform:none;width:45%;max-width:620px; }
+.harbor-game .field-message { background:#0b100dcc;border:0;border-left:2px solid #c7a16980;padding:12px 16px;box-shadow:none; }
+.harbor-game .field-message>img { border-radius:3px;width:52px;height:62px; }
+.harbor-game .field-message p:not(.eyebrow) { font:15px/1.55 Georgia,serif; }
+.harbor-game .explore-bar { justify-content:flex-end; }
+.harbor-game .explore-bar>span { display:none; }
+.harbor-game .explore-bar button { font-size:14px;min-width:230px;background:#d2b37e; }
+.harbor-game .utility { top:auto;bottom:max(20px,env(safe-area-inset-bottom));left:5%;right:5%;display:flex;flex-direction:row;justify-content:center;gap:0;border-top:1px solid #d4b98440;padding-top:12px; }
+.harbor-game .utility button { flex:1;max-width:180px;justify-content:center;background:transparent;border:0;border-radius:0;color:#d6d1c3;font-size:12px;min-height:52px; }
+.harbor-game .utility button:hover { background:#d9bc8120;color:#fff; }
+.harbor-game .utility button>span { color:#d9bc81; }
+.radio-dock { position:absolute;z-index:3;right:calc(4% + 65px);top:16px;margin:0;max-width:310px;background:transparent;border:0;font-size:10px; }
+.radio-dock summary { padding:10px 0;min-height:44px;display:flex;align-items:center;gap:10px;letter-spacing:1px; }
+.radio-dock summary>span:last-child { display:none; }
+.radio-dock[open] { padding:10px 16px;background:#141916f5;border:1px solid #bca57855; }
+.radio-dock[open] summary>span:last-child { display:inline;letter-spacing:0; }
+.radio-controls { display:grid;gap:12px; }
+.radio-controls label { display:flex;align-items:center;justify-content:space-between;gap:10px; }
+.radio-controls select { max-width:190px;background:#242b25;color:#efe6d6;border:1px solid #a7916466;padding:8px; }
+.signal-on { color:#9dd5b8; }
+.harbor-game.in-combat .bottom-hud { width:min(680px,90%);right:5%;bottom:105px; }
+.harbor-game .combat { background:#101714ed;border-color:#bda37566;max-height:65dvh; }
+.harbor-game .actions { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.battle-scene { position:absolute;left:5%;top:28%;width:35%; }
+.battle-scene h2 { font-size:50px;margin-top:12px;text-shadow:0 2px 15px #000; }
+.harbor-game dialog { width:min(800px,calc(100% - 32px));max-height:calc(100dvh - 40px);background:#131a17;border:1px solid #a78f6355;border-radius:3px; }
+.harbor-game .panel { padding:34px clamp(20px,4vw,44px); }
+.panel-notice { padding:12px 14px;background:#c3b18410;border-left:2px solid #c3b18480;font-size:12px!important;color:#dfd4bf!important;margin:20px 0!important; }
+.story-list,.story-choices,.contract-list { display:grid;gap:14px;margin-top:24px; }
+.story-list button,.story-choices button { text-align:left;padding:20px;background:#a18d6010;border:1px solid #a18d6040; }
+.story-list strong { display:block;font:26px Georgia,serif;margin:8px 0; }
+.story-list span { display:block;font-size:13px;line-height:1.6;color:#b7bbae; }
+.story-list small { color:#d6b67e;letter-spacing:1px; }
+.story-choices strong { font:21px Georgia,serif;display:block; }
+.story-choices small { font-size:13px;line-height:1.65;margin:10px 0; }
+.story-choices em { display:block;font-size:12px;color:#e4bc91;font-style:normal; }
+.story-choices button>span { display:block;margin-top:12px;font-size:11px;letter-spacing:1px;color:#e5c18b; }
+.scene-portrait { width:140px;height:165px;object-fit:cover;float:right;margin:15px 0 20px 25px;border:1px solid #bca47855; }
+.story-scene .dialogue { font:20px/1.8 Georgia,serif;clear:none;color:#e9e2ce;margin-bottom:26px; }
+.story-choices,.decision-record { clear:both; }
+.decision-record { padding:24px;border:1px solid #b49b6466;margin:20px 0; }
+.decision-record h3 { font:28px Georgia,serif;margin:10px 0; }
+.decision-record p { margin-top:14px; }
+.history-choice { display:block;width:100%;text-align:left;margin:8px 0; }
+.contract-list article { border-top:1px solid #baa37355;padding:24px 0 8px; }
+.contract-list h3 { font:28px Georgia,serif;margin:10px 0; }
+.contract-list p { color:#c3c9bb;font-size:14px; }
+.contract-list .reward-line { color:#d6b67e;font-size:12px;margin:12px 0; }
+.contract-actions,.service-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 24px; }
+.contract-actions button { padding:12px 8px;font-size:13px; }
+.service-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.service-grid button { text-align:left;padding:18px 14px; }
+.completed { color:#9ec5a2!important; }
+.region-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px; }
+.region-grid button { padding:0;text-align:left;overflow:hidden; }
+.region-grid img { width:100%;height:160px;object-fit:cover; }
+.region-grid strong,.region-grid small,.region-grid span { display:block;margin:10px 14px; }
+.region-grid strong { font:25px Georgia,serif; }
+.region-grid span { color:#d5b47e;font-size:11px; }
+.companion-card { display:flex;align-items:center;gap:20px;margin:20px 0; }
+.companion-card img { width:90px;height:110px;object-fit:cover; }
+.companion-card h3 { font:23px Georgia,serif; }
+.companion-card p { margin-top:10px;font-size:12px; }
+.view-choice { display:flex;gap:10px;margin-bottom:20px; }
+.view-choice [aria-pressed=true] { border-color:#dfbd82;background:#79644355; }
+@media(max-width:700px){
+ .harbor-game .hud-top{left:20px;right:20px;top:max(16px,env(safe-area-inset-top));}
+ .harbor-game .identity h1{font-size:21px;}
+ .harbor-game .vitals{left:20px;top:80px;transform:none;width:170px;}
+ .harbor-game .health-label{font-size:10px;}
+ .harbor-game .rank-progress{font-size:9px;}
+ .radio-dock{right:22px;top:77px;max-width:calc(100% - 44px);}
+ .radio-dock summary{font-size:9px;gap:6px;}
+ .place-caption{left:24px;top:28%;max-width:85%;}
+ .place-caption>p{font-size:48px;letter-spacing:-1px;}
+ .place-caption>.eyebrow{font-size:8px;letter-spacing:1.3px;}
+ .place-caption>span:last-child{font-size:16px;}
+ .journey-backdrop{object-position:58% center;}
+ .harbor-game .objective{bottom:235px;left:24px;width:calc(100% - 48px);}
+ .harbor-game .objective h2{font-size:27px;margin:6px 0;}
+ .harbor-game .objective>.eyebrow{font-size:9px;}
+ .harbor-game .objective>p:not(.eyebrow){font-size:12px;max-width:100%;line-height:1.45;}
+ .harbor-game .bottom-hud{bottom:90px;left:20px;right:20px;width:auto;gap:10px;}
+ .harbor-game .field-message{padding:8px 12px;max-height:86px;overflow:auto;}
+ .harbor-game .field-message>img{width:32px;height:42px;}
+ .harbor-game .field-message p:not(.eyebrow){font-size:12px;line-height:1.4;}
+ .harbor-game .explore-bar button{width:100%;min-height:48px;}
+ .harbor-game .explore-bar{display:block;}
+ .harbor-game .utility{left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));padding-top:8px;gap:0;}
+ .harbor-game .utility button{flex-direction:column;gap:4px;font-size:9px;min-width:0;padding:3px 2px;min-height:55px;}
+ .harbor-game .utility button>span{font-size:19px;}
+ .harbor-game.in-combat .bottom-hud{left:14px;right:14px;width:auto;bottom:88px;}
+ .harbor-game .combat{max-height:calc(100dvh - 235px);padding:14px;}
+ .harbor-game .combat-heading h2{font-size:23px;}
+ .harbor-game .actions{grid-template-columns:repeat(2,minmax(0,1fr));}
+ .harbor-game .actions button{min-height:55px;}
+ .battle-scene{display:none;}
+ .contract-actions{grid-template-columns:1fr;}
+ .contract-actions button{text-align:left;padding:12px 16px;}
+ .region-grid{grid-template-columns:1fr;}
+ .scene-portrait{width:90px;height:110px;margin-left:16px;}
+ .story-scene .dialogue{font-size:18px;line-height:1.7;}
+ .story-choices strong{font-size:20px;}
+}
+@media(max-height:680px){
+ .harbor-game .place-caption{top:26%;}.harbor-game .place-caption>p{font-size:36px;}
+ .harbor-game .objective>p:not(.eyebrow){display:none;}.harbor-game .objective{bottom:200px;}
+ .harbor-game .field-message{max-height:58px;}.harbor-game .bottom-hud{bottom:86px;}
+}
+@media(max-height:550px) and (min-width:600px){
+ .harbor-game .objective{bottom:100px;width:33%;}.harbor-game .bottom-hud{width:50%;bottom:90px;}
+ .harbor-game .vitals{top:22px;}.harbor-game .place-caption{top:27%;}
+ .harbor-game.in-combat .bottom-hud{width:65%;}.harbor-game .combat{max-height:calc(100dvh - 115px);}
+ .harbor-game .battle-scene{display:none;}.harbor-game .radio-dock{right:90px;}
+}
+.walk-controls {position:absolute;left:5%;bottom:300px;display:flex;align-items:center;gap:12px;z-index:2;}
+.movement-pad{width:100px;height:100px;border:1px solid #d0b48770;border-radius:50%;background:#0e181baa;display:grid;place-items:center;touch-action:none;}
+.movement-pad span{width:46px;height:46px;border-radius:50%;background:#b69c7466;display:grid;place-items:center;font-size:25px;pointer-events:none;}
+.walk-controls button{background:#0e181bcc;font-size:10px;padding:10px;}
+@media(max-width:700px){.walk-controls{left:20px;bottom:340px;}.movement-pad{width:88px;height:88px;}.walk-controls button{max-width:80px;}}
+.harbor-game .panel>.close {position:sticky;top:8px;float:right;right:auto;z-index:5;background:#131a17ee;margin:-20px -10px 0 10px;}
