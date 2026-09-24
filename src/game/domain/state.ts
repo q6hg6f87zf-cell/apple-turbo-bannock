@@ -1,8 +1,10 @@
+import { emptyLife } from "../life-state";
 import { CHARACTER_IDS, FACTIONS, REGION_ANCHORS } from "./characters";
 import { MEMORY_RULES } from "./narrative";
 import type { Save } from "./types";
 export const initial = (): Save => ({
   version: 2,
+  life: emptyLife(),
   started: false,
   player: {
     position: { x: 0, z: 13 },
