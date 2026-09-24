@@ -1,3 +1,4 @@
+import { availableWatch, spendWatch } from "./watches";
 import type {
   Save,
   RegionId,
@@ -337,9 +338,15 @@ export function takeContract(
     s.choices["contract:" + id]
   )
     return result(s, "This contract is not available.");
+  if (!availableWatch(s))
+    return result(
+      s,
+      "No watches remain. End the day at the work board before taking another contract.",
+    );
   if (method === "negotiate") {
     if (s.factions[c.faction].reputation < 2 && !hasItem(s, "grey-credentials"))
       return result(s, "Needs 2 local reputation or Grey Credentials.");
+    spendWatch(s);
     finishContract(s, c, "negotiated passage");
     return result(
       s,
@@ -352,6 +359,7 @@ export function takeContract(
       return result(s, "Needs one Field Gel and one water.");
     s.inventory.supplies.medicine--;
     s.inventory.supplies.water--;
+    spendWatch(s);
     finishContract(s, c, "supplied an alternate route");
     return result(
       s,
@@ -361,6 +369,7 @@ export function takeContract(
   }
   if (!activeWeapon(s))
     return result(s, "Equip a weapon before taking the road.");
+  spendWatch(s);
   s.encounters.active = {
     enemy: c.risk === "sentinel" ? "scout" : "enforcer",
     pattern: c.risk,
