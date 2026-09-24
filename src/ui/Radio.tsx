@@ -12,7 +12,15 @@ export const TRACKS = [
   ["meet-me-in-veyra", "Meet Me in Veyra", "veyra"],
   ["welcome-to-the-thirty-eight", "Welcome to the Thirty-Eight", "casino"],
 ];
-export function Radio({ region, duck }: { region: RegionId; duck: boolean }) {
+export function Radio({
+  region,
+  duck,
+  casino = false,
+}: {
+  region: RegionId;
+  duck: boolean;
+  casino?: boolean;
+}) {
   const audio = useRef<HTMLAudioElement>(null);
   const [index, setIndex] = useState(0),
     [playing, setPlaying] = useState(false),
@@ -21,10 +29,10 @@ export function Radio({ region, duck }: { region: RegionId; duck: boolean }) {
     [error, setError] = useState("");
   useEffect(() => {
     if (follow) {
-      const i = TRACKS.findIndex((t) => t[2] === region);
+      const i = TRACKS.findIndex((t) => t[2] === (casino ? "casino" : region));
       if (i >= 0) setIndex(i);
     }
-  }, [region, follow]);
+  }, [region, follow, casino]);
   useEffect(() => {
     if (audio.current) audio.current.volume = volume * (duck ? 0.22 : 1);
   }, [volume, duck]);
