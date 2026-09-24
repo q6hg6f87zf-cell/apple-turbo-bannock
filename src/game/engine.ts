@@ -1,3 +1,6 @@
+import { finishJob } from "./watches";
+import { contractById } from "./expeditions";
+import { finishContract } from "./harbor";
 import { SITES, type SiteId } from "./world";
 import type { Save, Battle, AmmoGrade } from "./domain/types";
 import { initial, level, maxHp } from "./domain/state";
@@ -10,6 +13,7 @@ import {
   weaponDamage,
   fireWeapon,
   protection,
+  loadPenalty,
   installNext,
   conditionName,
 } from "./domain/inventory";
@@ -26,7 +30,14 @@ export { initial, level, maxHp };
 export { parseSave } from "./domain/save";
 export type { Save, Battle };
 export type Action =
-  "strike" | "guard" | "aim" | "heal" | "reload" | "swap" | "retreat";
+  | "strike"
+  | "guard"
+  | "aim"
+  | "heal"
+  | "reload"
+  | "swap"
+  | "retreat"
+  | "support";
 import { result, note, type Outcome } from "./domain/outcome";
 export type { Outcome };
 import { ironcladInteract } from "./regions/ironclad-rules";
@@ -61,7 +72,13 @@ export const damage = (s: Save) => {
   return w ? weaponDamage(w) : 0;
 };
 export const enemyName = (b: Battle) =>
-  b.enemy === "scout" ? "Recovery contract guard" : "Rail recovery enforcer";
+  b.workOrder
+    ? `Recovery sweep / day ${b.workOrder.day}`
+    : b.contractId
+      ? (contractById(b.contractId)?.name ?? "Recovery patrol")
+      : b.enemy === "scout"
+        ? "Recovery contract guard"
+        : "Rail recovery enforcer";
 export type EnemyTurn = {
   name: string;
   phase: string;
@@ -143,7 +160,10 @@ export function strikeDamage(s: Save): number {
   return (
     Math.max(
       1,
-      weaponDamage(w) - Math.max(0, (t?.armour ?? 0) - d.penetration),
+      weaponDamage(w) +
+        (s.choices["perk:steady-hand"] && d.family !== "bb" ? 1 : 0) -
+        loadPenalty(s) -
+        Math.max(0, (t?.armour ?? 0) - d.penetration),
     ) +
     (s.encounters.active?.exposed && d.family !== "bb" ? 4 : 0) +
     (t?.vulnerable && d.family !== "bb" ? 4 : 0)
@@ -152,6 +172,11 @@ export function strikeDamage(s: Save): number {
 export function actionBlocked(s: Save, a: Action): string {
   const w = activeWeapon(s),
     d = w && WEAPONS[w.definition];
+  if (
+    a === "support" &&
+    (s.tyrone.chassis !== "T-0888" || s.encounters.active?.supportUsed)
+  )
+    return "Requires T-0888; once per encounter";
   if ((a === "strike" || a === "aim") && (!w || !w.condition))
     return "Equip a functioning weapon";
   if ((a === "strike" || a === "aim") && d?.caliber && !w!.loaded.rounds)
@@ -187,14 +212,16 @@ export function actionForecast(s: Save, a: Action): string {
   if (out.kind === "win") return `${out.damage} damage · finishes encounter`;
   const prefix =
     a === "guard"
-      ? "Block 8 · +2 focus"
+      ? `Block ${s.choices["perk:iron-will"] ? 10 : 8} · +2 focus`
       : a === "heal"
-        ? `Heal ${Math.min(16, maxHp(s) - s.player.hp)}`
+        ? `Heal ${Math.min(16 + (s.choices["perk:field-medic"] ? 4 : 0), maxHp(s) - s.player.hp)}`
         : a === "reload"
           ? "Load matching ammunition"
-          : a === "swap"
-            ? "Swap weapon"
-            : `${out.damage ?? 0} damage`;
+          : a === "support"
+            ? "Heal 8 · disrupt 6 · +1 focus"
+            : a === "swap"
+              ? "Swap weapon"
+              : `${out.damage ?? 0} damage`;
   return `${prefix} · ${out.incoming ? `take ${out.incoming}` : "no damage taken"}`;
 }
 export const inVault = (s: Save) =>
@@ -251,6 +278,13 @@ export function act(input: Save, action: Action): Outcome {
     absorbed = 0,
     text = "";
   const interrupted = action === "aim" && b.exposed && turn.heavy;
+  if (action === "support") {
+    b.supportUsed = true;
+    absorbed = 6;
+    s.player.hp = Math.min(maxHp(s), s.player.hp + 8);
+    s.player.focus = Math.min(4, s.player.focus + 1);
+    text = "Porchlight: Tyrone restores 8 health and disrupts the next attack.";
+  }
   if (action === "strike") {
     dealt = strikeDamage(s);
     fireWeapon(w);
@@ -268,13 +302,16 @@ export function act(input: Save, action: Action): Outcome {
       : `Firing arm exposed. ${dealt} damage. A second aimed shot during the heavy wind-up response can interrupt.`;
   }
   if (action === "guard") {
-    absorbed = 8;
+    absorbed = 8 + (s.choices["perk:iron-will"] ? 2 : 0);
     s.player.focus = Math.min(4, s.player.focus + 2);
-    text = "Braced. Block 8; recover 2 focus.";
+    text = `Braced. Block ${absorbed}; recover 2 focus.`;
   }
   if (action === "heal") {
     s.inventory.supplies.medicine--;
-    s.player.hp = Math.min(maxHp(s), s.player.hp + 16);
+    s.player.hp = Math.min(
+      maxHp(s),
+      s.player.hp + 16 + (s.choices["perk:field-medic"] ? 4 : 0),
+    );
     text = "Field Gel applied.";
   }
   if (action === "reload") {
@@ -291,6 +328,27 @@ export function act(input: Save, action: Action): Outcome {
   b.hp = Math.max(0, b.hp - dealt);
   if (!b.hp) {
     s.encounters.active = null;
+    if (b.workOrder) {
+      finishJob(s, "patrol", b.workOrder.region);
+      s.player.hp = Math.min(maxHp(s), s.player.hp + 8);
+      return result(
+        s,
+        "Recovery sweep cleared. The settlement pays the work order.",
+        "win",
+        { damage: dealt, incoming: 0 },
+      );
+    }
+    if (b.contractId) {
+      const contract = contractById(b.contractId);
+      if (contract) finishContract(s, contract, "defeated the recovery patrol");
+      s.player.hp = Math.min(maxHp(s), s.player.hp + 8);
+      return result(
+        s,
+        "Route secured. Field intelligence, supplies and local standing earned.",
+        "win",
+        { damage: dealt, incoming: 0 },
+      );
+    }
     s.encounters.resolved.push(b.enemy);
     if (b.enemy === "scout") {
       const key = grantItem(s, "recovery-warrant", "rail-warrant", "vesper");

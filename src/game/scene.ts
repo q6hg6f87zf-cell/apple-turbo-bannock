@@ -71,6 +71,18 @@ export class IroncladScene {
   private focus = new T.Vector3();
   private temp = new T.Vector3();
   private aim = new T.Vector3();
+  private yaw = Math.atan2(10, 17);
+  private zoom = 1;
+  private dragging = false;
+  private pointerLast = { x: 0, y: 0 };
+  private stick = { x: 0, y: 0 };
+  setMovement(x: number, y: number) {
+    this.stick = { x, y };
+  }
+  resetCamera() {
+    this.yaw = Math.atan2(10, 17);
+    this.zoom = 1;
+  }
   private pointerStart = { x: 0, y: 0 };
   constructor(
     private host: HTMLElement,
@@ -86,7 +98,7 @@ export class IroncladScene {
     });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = T.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = T.PCFShadowMap;
     this.renderer.setClearColor("#1b2929");
     this.renderer.outputColorSpace = T.SRGBColorSpace;
     this.renderer.toneMapping = T.ACESFilmicToneMapping;
@@ -171,6 +183,14 @@ export class IroncladScene {
     this.resize();
     this.renderer.domElement.addEventListener("pointerdown", this.pointerDown);
     this.renderer.domElement.addEventListener("pointerup", this.pointerUp);
+    this.renderer.domElement.addEventListener("pointermove", this.pointerMove);
+    this.renderer.domElement.addEventListener(
+      "pointercancel",
+      this.pointerCancel,
+    );
+    this.renderer.domElement.addEventListener("wheel", this.wheel, {
+      passive: false,
+    });
     this.renderer.domElement.addEventListener(
       "webglcontextlost",
       this.contextLost,
@@ -571,6 +591,8 @@ export class IroncladScene {
   setPaused(v: boolean) {
     this.paused = v;
     this.keys.clear();
+    this.stick = { x: 0, y: 0 };
+    this.dragging = false;
   }
   travel(id: SiteId) {
     if (
@@ -647,8 +669,25 @@ export class IroncladScene {
   }
   private pointerDown = (e: PointerEvent) => {
     this.pointerStart = { x: e.clientX, y: e.clientY };
+    this.pointerLast = { x: e.clientX, y: e.clientY };
+    this.dragging = true;
+    this.renderer.domElement.setPointerCapture(e.pointerId);
+  };
+  private pointerCancel = () => {
+    this.dragging = false;
+  };
+  private wheel = (e: WheelEvent) => {
+    if (this.paused) return;
+    e.preventDefault();
+    this.zoom = Math.max(0.7, Math.min(1.5, this.zoom + e.deltaY * 0.001));
+  };
+  private pointerMove = (e: PointerEvent) => {
+    if (!this.dragging || this.paused) return;
+    this.yaw -= (e.clientX - this.pointerLast.x) * 0.006;
+    this.pointerLast = { x: e.clientX, y: e.clientY };
   };
   private pointerUp = (e: PointerEvent) => {
+    this.dragging = false;
     if (
       this.paused ||
       this.state.encounters.active ||
@@ -704,6 +743,8 @@ export class IroncladScene {
   };
   private blur = () => {
     this.keys.clear();
+    this.stick = { x: 0, y: 0 };
+    this.dragging = false;
   };
   private visibility = () => {
     this.keys.clear();
@@ -722,25 +763,17 @@ export class IroncladScene {
     if (document.hidden) return;
     this.time += dt;
     if (!this.paused && !this.state.encounters.active) {
-      if (this.keys.size) {
-        let x = 0,
-          z = 0;
-        if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) {
-          x -= 0.857;
-          z += 0.514;
-        }
-        if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) {
-          x += 0.857;
-          z -= 0.514;
-        }
-        if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) {
-          x -= 0.514;
-          z -= 0.857;
-        }
-        if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) {
-          x += 0.514;
-          z += 0.857;
-        }
+      if (this.keys.size || Math.hypot(this.stick.x, this.stick.y) > 0.12) {
+        let horizontal = this.stick.x,
+          vertical = this.stick.y;
+        if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) horizontal--;
+        if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) horizontal++;
+        if (this.keys.has("KeyW") || this.keys.has("ArrowUp")) vertical--;
+        if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) vertical++;
+        const x =
+          horizontal * Math.cos(this.yaw) + vertical * Math.sin(this.yaw);
+        const z =
+          -horizontal * Math.sin(this.yaw) + vertical * Math.cos(this.yaw);
         const l = Math.hypot(x, z) || 1;
         const p = {
           x: this.player.position.x + (x / l) * dt * 4,
@@ -817,11 +850,11 @@ export class IroncladScene {
     }
     if (!this.reduced) this.robot.rotation.z = Math.sin(this.time * 2) * 0.025;
     this.focus.lerp(this.player.position, 1 - Math.exp(-dt * 5));
-    const distance = this.camera.aspect < 0.75 ? 1.35 : 1;
+    const distance = (this.camera.aspect < 0.75 ? 1.08 : 1) * this.zoom;
     this.camera.position.set(
-      this.focus.x + 10 * distance,
+      this.focus.x + Math.sin(this.yaw) * 19.7 * distance,
       this.focus.y + 16 * distance,
-      this.focus.z + 17 * distance,
+      this.focus.z + Math.cos(this.yaw) * 19.7 * distance,
     );
     this.camera.lookAt(this.focus.x, 0, this.focus.z - 2);
     if (!this.reduced)
@@ -869,6 +902,15 @@ export class IroncladScene {
       this.pointerDown,
     );
     this.renderer.domElement.removeEventListener("pointerup", this.pointerUp);
+    this.renderer.domElement.removeEventListener(
+      "pointermove",
+      this.pointerMove,
+    );
+    this.renderer.domElement.removeEventListener(
+      "pointercancel",
+      this.pointerCancel,
+    );
+    this.renderer.domElement.removeEventListener("wheel", this.wheel);
     this.renderer.domElement.removeEventListener(
       "webglcontextlost",
       this.contextLost,

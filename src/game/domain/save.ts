@@ -1,3 +1,5 @@
+import { emptyLife, validLife } from "../life-state";
+import { contractById } from "../expeditions";
 import { initial, maxHp } from "./state";
 import { WEAPONS, ITEMS } from "./registry";
 import { AMMO_GRADES, type Save } from "./types";
@@ -49,6 +51,8 @@ export function parseSave(raw: string | null): Save | null {
     const s = JSON.parse(raw);
     if (!record(s) || s.version !== 2 || typeof s.started !== "boolean")
       return null;
+    if (!Object.hasOwn(s, "life")) s.life = emptyLife();
+    if (!validLife(s.life)) return null;
     for (const key of Object.keys(initial()).filter(
       (k) => !["version", "started"].includes(k),
     ))
@@ -318,6 +322,13 @@ export function parseSave(raw: string | null): Save | null {
     if (t.chassis === "T-0888") {
       const before = structuredClone(save);
       before.tyrone.chassis = "T-0880";
+      // Trust can fall after an earned rebuild. Validate the recorded event,
+      // not an impossible requirement to rebuild him again on every load.
+      if (
+        save.choices.canon_rebuild === "consent" &&
+        save.world.flags.includes("t0888-rebuild")
+      )
+        before.tyrone.trust = Math.max(3, before.tyrone.trust);
       if (!canRebuildTyrone(before)) return null;
     }
     if (q.chapter === 1) {
@@ -368,6 +379,26 @@ export function parseSave(raw: string | null): Save | null {
         return null;
     }
     const b = s.encounters.active;
+    const contract = b?.contractId ? contractById(b.contractId) : undefined;
+    if (
+      b?.contractId &&
+      (!contract ||
+        contract.region !== p.region ||
+        s.choices["contract:" + b.contractId])
+    )
+      return null;
+    if (b?.supportUsed !== undefined && typeof b.supportUsed !== "boolean")
+      return null;
+    if (
+      b?.workOrder &&
+      (!record(b.workOrder) ||
+        b.workOrder.day !== s.life.day ||
+        b.workOrder.region !== p.region ||
+        b.enemy !== "enforcer" ||
+        b.contractId ||
+        s.life.completed.includes(`${s.life.day}:${p.region}:patrol`))
+    )
+      return null;
     if (b !== null) {
       if (
         !record(b) ||
@@ -378,7 +409,9 @@ export function parseSave(raw: string | null): Save | null {
         b.maxHp !== (b.enemy === "scout" ? 24 : 46) ||
         !integer(b.turn) ||
         typeof b.exposed !== "boolean" ||
-        q.phase !== (b.enemy === "scout" ? "rail" : "blockade")
+        (!contract &&
+          !b.workOrder &&
+          q.phase !== (b.enemy === "scout" ? "rail" : "blockade"))
       )
         return null;
     }
