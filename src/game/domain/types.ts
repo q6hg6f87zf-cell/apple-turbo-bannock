@@ -206,6 +206,8 @@ export type Phase =
   | "settlement"
   | "complete";
 export type Battle = {
+  contractId?: string;
+  supportUsed?: boolean;
   enemy: "scout" | "enforcer";
   hp: number;
   maxHp: number;
