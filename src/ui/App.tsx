@@ -1,3 +1,14 @@
+import { MovementPad } from "./MovementPad";
+import {
+  Campaign,
+  Contracts,
+  SettlementServices,
+  WorldMap,
+  Relationships,
+} from "./HarborPanels";
+import { Radio } from "./Radio";
+import { campaignStarted, visibleScenes, sceneLocked } from "../game/harbor";
+import { REGION_ANCHORS } from "../game/domain/characters";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { App as NativeApp } from "@capacitor/app";
 import {
@@ -38,12 +49,24 @@ import { activeWeapon } from "../game/domain/inventory";
 import { WEAPONS } from "../game/domain/registry";
 import { ironcladEffects } from "../game/domain/narrative";
 
-type Panel = "gear" | "journal" | "settings" | "destinations" | SiteId | null;
+type Panel =
+  | "campaign"
+  | "contracts"
+  | "settlement"
+  | "world"
+  | "people"
+  | "gear"
+  | "journal"
+  | "settings"
+  | "destinations"
+  | SiteId
+  | null;
 export function App() {
   const [state, setState] = useState<Save>(initial),
     [ready, setReady] = useState(false),
     [entered, setEntered] = useState(false),
     [sceneReady, setSceneReady] = useState(false);
+  const [view, setView] = useState<"journey" | "walk">("journey");
   const [panel, setPanel] = useState<Panel>(null),
     [notice, setNotice] = useState(""),
     [warning, setWarning] = useState(""),
@@ -93,7 +116,13 @@ export function App() {
     };
   }, []);
   useEffect(() => {
-    if (!entered || !host.current) return;
+    if (!entered) return;
+    if (view === "journey" || state.player.region !== "ironclad") {
+      setSceneReady(true);
+      return;
+    }
+    if (!host.current) return;
+    setSceneReady(false);
     let disposed = false;
     void import("../game/scene")
       .then(({ IroncladScene }) => {
@@ -117,6 +146,7 @@ export function App() {
             },
             setGraphicsError,
           );
+          scene.current.setPaused(!!modal.current?.open);
           setSceneReady(true);
         } catch {
           setGraphicsError(
@@ -135,7 +165,7 @@ export function App() {
       scene.current?.dispose();
       scene.current = null;
     };
-  }, [entered, commit, apply]);
+  }, [entered, view, state.player.region, commit, apply]);
   useEffect(() => {
     scene.current?.update(state);
   }, [state]);
@@ -193,11 +223,34 @@ export function App() {
         ? `Encounter resumed. ${intent(live.current.encounters.active)}`
         : live.current.progression.phase !== "wake"
           ? `Checkpoint restored. ${objective(live.current).body}`
-          : "You wake in Vault 13. Tap the floor to move. Tyrone is checking whether you can hear him.",
+          : "You wake in Vault 13. Tyrone is checking whether you can hear him. Continue the journey to answer.",
     );
   };
   const travel = (id: SiteId) => {
-    if (!scene.current || !sceneReady) return;
+    if (
+      !sceneReady ||
+      live.current.encounters.active ||
+      !siteAvailable(live.current, id)
+    )
+      return;
+    if (view === "journey") {
+      const site = SITES.find((p) => p.id === id)!;
+      const out = interact(
+        {
+          ...live.current,
+          player: {
+            ...live.current.player,
+            position: { x: site.x, z: Math.min(16, site.z + 1) },
+          },
+        },
+        id,
+      );
+      setPanel(null);
+      apply(out);
+      if (!out.state.encounters.active) setPanel(id);
+      return;
+    }
+    if (!scene.current) return;
     setPanel(null);
     setTravelling(SITES.find((s) => s.id === id)!.name);
     scene.current?.setPaused(false);
@@ -221,7 +274,21 @@ export function App() {
     setTravelling("");
     setPanel(p);
   };
-  const obj = objective(state),
+  const expanded = campaignStarted(state);
+  const nextScene = visibleScenes(state).find(
+    (c) => !sceneLocked(state, c).length,
+  );
+  const obj = expanded
+      ? {
+          title: nextScene?.title ?? "The roads beyond",
+          body: nextScene
+            ? "A conversation is ready. Your evidence will decide which approaches remain open."
+            : "Work the local routes for intelligence, or travel to a region with unfinished stories.",
+          step: Object.keys(state.choices).filter((k) => k.startsWith("canon_"))
+            .length,
+          target: "gate" as SiteId,
+        }
+      : objective(state),
     b = state.encounters.active;
   const telegraph = b ? enemyTurn(b) : null;
   const rankFloor = level(state) === 3 ? 150 : level(state) === 2 ? 60 : 0;
@@ -233,6 +300,8 @@ export function App() {
   const w = activeWeapon(state),
     wd = w && WEAPONS[w.definition],
     effects = ironcladEffects(state);
+  const continueJourney = () =>
+    expanded ? open("campaign") : travel(obj.target);
   if (!ready)
     return (
       <main className="loading">
@@ -274,15 +343,65 @@ export function App() {
         </div>
         <footer className="title-bottom">
           <span>EXPLORE. REPAIR. CHOOSE.</span>
-          <span>CANON FOUNDATION / DEVELOPMENT BUILD</span>
+          <span>THE HOLLOW / A ROAD OF YOUR OWN</span>
         </footer>
       </main>
     );
   return (
     <main
-      className={`game ${state.settings.reducedMotion ? "reduce-motion" : ""}`}
+      className={`game harbor-game ${view === "journey" || state.player.region !== "ironclad" ? "scenic-view" : "walk-view"} ${b ? "in-combat" : ""} ${state.settings.reducedMotion ? "reduce-motion" : ""}`}
     >
       <div className="world" ref={host} aria-busy={!sceneReady} />
+      {view === "journey" || state.player.region !== "ironclad" ? (
+        <div className="journey-scene">
+          <img
+            className="journey-backdrop"
+            src={
+              inVault(state)
+                ? "./art/tyrone-wake.jpg"
+                : `./art/places/${state.player.region}-street.jpg`
+            }
+            alt={
+              inVault(state)
+                ? "Tyrone finds you in Vault 13"
+                : `${REGION_ANCHORS[state.player.region].name}, the road ahead`
+            }
+          />
+          <div className="scene-shade" />
+          {!b ? (
+            <div className="place-caption">
+              <span className="eyebrow">
+                {inVault(state)
+                  ? "THREE MILES EAST OF IRONCLAD"
+                  : REGION_ANCHORS[state.player.region].reference}
+              </span>
+              <p>
+                {inVault(state)
+                  ? "Someone stopped."
+                  : REGION_ANCHORS[state.player.region].name}
+              </p>
+              <span>
+                {inVault(state)
+                  ? "An old machine. A second chance."
+                  : expanded
+                    ? "People to find. Promises to keep."
+                    : "The town at the end of the invoice."}
+              </span>
+            </div>
+          ) : (
+            <div className="battle-scene">
+              <span className="eyebrow">THE ROAD DOES NOT BELONG TO THEM</span>
+              <h2>{enemyName(b)}</h2>
+            </div>
+          )}
+        </div>
+      ) : null}
+      {view === "walk" && state.player.region === "ironclad" && !b && !panel ? (
+        <MovementPad
+          move={(x, y) => scene.current?.setMovement(x, y)}
+          reset={() => scene.current?.resetCamera()}
+        />
+      ) : null}
       <div className="vignette" />
       <header className="hud-top">
         <div className="identity">
@@ -290,7 +409,9 @@ export function App() {
           <div>
             <span className="eyebrow">HOLLOW REALM</span>
             <h1>
-              {inVault(state) ? "Vault 13" : "Ironclad"}{" "}
+              {inVault(state)
+                ? "Vault 13"
+                : REGION_ANCHORS[state.player.region].name}{" "}
               <span>/ {inVault(state) ? "Found You" : "The Invoice"}</span>
             </h1>
           </div>
@@ -304,6 +425,7 @@ export function App() {
           Ⅱ
         </button>
       </header>
+      <Radio region={state.player.region} duck={!!panel || !!b} />
       <section className="vitals" aria-label="Player status">
         <div>
           <span className="rank">{String(level(state)).padStart(2, "0")}</span>
@@ -349,36 +471,78 @@ export function App() {
       {!b ? (
         <aside className="objective">
           <p className="eyebrow">
-            ACT I <span>{obj.step} / 8</span>
+            {expanded ? "THE HOLLOW" : "ACT I"}{" "}
+            <span>
+              {obj.step} / {expanded ? 15 : 8}
+            </span>
           </p>
           <h2>{obj.title}</h2>
           <p>{obj.body}</p>
           <button
             className="text-button"
             disabled={!sceneReady}
-            onClick={() => travel(obj.target)}
+            onClick={continueJourney}
           >
-            {travelling ? `Walking to ${travelling}…` : "Follow objective"} ↗
+            {travelling
+              ? `Walking to ${travelling}…`
+              : expanded
+                ? "Open story"
+                : "Follow objective"}{" "}
+            ↗
           </button>
         </aside>
       ) : null}
       <nav className="utility" aria-label="Game menus">
-        <button disabled={!sceneReady} onClick={() => open("gear")}>
-          <span>◇</span>Loadout
+        <button
+          aria-label="Story"
+          onClick={() => open(expanded ? "campaign" : "journal")}
+        >
+          <span>◇</span>Story
         </button>
-        <button disabled={!sceneReady} onClick={() => open("journal")}>
-          <span>≡</span>Journal
+        {expanded ? (
+          <button
+            aria-label="Fieldwork"
+            disabled={!!b}
+            onClick={() => open("contracts")}
+          >
+            <span>⚑</span>Fieldwork
+          </button>
+        ) : null}
+        <button aria-label="Loadout" onClick={() => open("gear")}>
+          <span>⌁</span>Loadout
         </button>
         <button
-          disabled={!!b || !sceneReady}
+          aria-label="Places"
+          disabled={!!b}
           onClick={() => open("destinations")}
         >
           <span>⌖</span>Places
+        </button>
+        {expanded ? (
+          <button
+            aria-label="Camp"
+            disabled={!!b}
+            onClick={() => open("settlement")}
+          >
+            <span>⚒</span>Camp
+          </button>
+        ) : null}
+        <button aria-label="Journal" onClick={() => open("journal")}>
+          <span>≡</span>Journal
         </button>
       </nav>
       {graphicsError ? (
         <div className="graphics-error" role="alert">
           <p>{graphicsError}</p>
+          <button
+            onClick={() => {
+              setView("journey");
+              setGraphicsError("");
+              setSceneReady(true);
+            }}
+          >
+            Continue illustrated journey
+          </button>
           <button onClick={() => location.reload()}>Reload</button>
         </div>
       ) : null}
@@ -422,7 +586,15 @@ export function App() {
             </div>
             <div className="actions">
               {(
-                ["strike", "guard", "aim", "heal", "reload", "swap"] as Action[]
+                [
+                  "strike",
+                  "guard",
+                  "aim",
+                  "heal",
+                  "reload",
+                  "swap",
+                  ...(state.tyrone.chassis === "T-0888" ? ["support"] : []),
+                ] as Action[]
               ).map((a) => (
                 <button
                   key={a}
@@ -439,6 +611,7 @@ export function App() {
                       reload: "Reload",
                       swap: "Swap",
                       retreat: "Retreat",
+                      support: "Tyrone support",
                     }[a]
                   }
                   <small>{actionForecast(state, a)}</small>
@@ -476,9 +649,13 @@ export function App() {
             <div className="explore-bar">
               <span>
                 <i className="live-dot" />{" "}
-                {travelling ? `Walking to ${travelling}` : "Tap to walk"}
+                {travelling
+                  ? `Walking to ${travelling}`
+                  : view === "walk"
+                    ? "Tap to walk · drag to look"
+                    : "Your next step"}
               </span>
-              <button disabled={!sceneReady} onClick={() => travel(obj.target)}>
+              <button disabled={!sceneReady} onClick={continueJourney}>
                 Continue journey ↗
               </button>
             </div>
@@ -496,9 +673,47 @@ export function App() {
           <button className="close" aria-label="Close panel" onClick={close}>
             ×
           </button>
+          {["contracts", "settlement", "world", "people"].includes(
+            panel ?? "",
+          ) ? (
+            <p className="panel-notice" role="status">
+              {notice}
+            </p>
+          ) : null}
+          {panel === "campaign" ? (
+            <Campaign state={state} apply={apply} />
+          ) : null}
+          {panel === "contracts" ? (
+            <Contracts
+              state={state}
+              apply={(out) => {
+                apply(out);
+                if (out.state.encounters.active) close();
+              }}
+            />
+          ) : null}
+          {panel === "settlement" ? (
+            <SettlementServices state={state} apply={apply} />
+          ) : null}
+          {panel === "world" ? (
+            <WorldMap
+              state={state}
+              apply={(out) => {
+                apply(out);
+                setView("journey");
+                close();
+              }}
+            />
+          ) : null}
+          {panel === "people" ? (
+            <Relationships state={state} apply={apply} />
+          ) : null}
           {panel === "gear" ? <Inventory state={state} apply={apply} /> : null}
           {panel === "journal" ? (
             <>
+              <button className="text-button" onClick={() => open("people")}>
+                People & Tyrone’s memories →
+              </button>
               <p className="eyebrow">FIELD NOTES</p>
               <h2>{obj.title}</h2>
               <p>{obj.body}</p>
@@ -526,6 +741,19 @@ export function App() {
                 {inVault(state) ? "VAULT 13" : "IRONCLAD"}
               </p>
               <h2>Choose your next step.</h2>
+              {expanded ? (
+                <>
+                  <button className="primary" onClick={() => open("world")}>
+                    Travel the Hollow →
+                  </button>
+                  <button
+                    className="text-button"
+                    onClick={() => open("contracts")}
+                  >
+                    Local fieldwork →
+                  </button>
+                </>
+              ) : null}
               {!inVault(state) ? (
                 <img
                   className="region-map"
@@ -534,20 +762,22 @@ export function App() {
                 />
               ) : null}
               <div className="destinations">
-                {SITES.filter((site) => siteAvailable(state, site.id)).map(
-                  (site) => (
-                    <button key={site.id} onClick={() => travel(site.id)}>
-                      <span>
-                        <small>
-                          {site.label}
-                          {site.id === obj.target ? " / OBJECTIVE" : ""}
-                        </small>
-                        <strong>{site.name}</strong>
-                      </span>
-                      <span>↗</span>
-                    </button>
-                  ),
-                )}
+                {SITES.filter(
+                  (site) =>
+                    state.player.region === "ironclad" &&
+                    siteAvailable(state, site.id),
+                ).map((site) => (
+                  <button key={site.id} onClick={() => travel(site.id)}>
+                    <span>
+                      <small>
+                        {site.label}
+                        {site.id === obj.target ? " / OBJECTIVE" : ""}
+                      </small>
+                      <strong>{site.name}</strong>
+                    </span>
+                    <span>↗</span>
+                  </button>
+                ))}
               </div>
             </>
           ) : null}
@@ -555,6 +785,27 @@ export function App() {
             <>
               <p className="eyebrow">TAKE A BREATH</p>
               <h2>Paused</h2>
+              <div className="view-choice">
+                <button
+                  aria-pressed={view === "journey"}
+                  onClick={() => {
+                    setView("journey");
+                    setGraphicsError("");
+                  }}
+                >
+                  Illustrated journey
+                </button>
+                <button
+                  disabled={state.player.region !== "ironclad" || !!b}
+                  aria-pressed={view === "walk"}
+                  onClick={() => {
+                    setView("walk");
+                    setGraphicsError("");
+                  }}
+                >
+                  Walk Ironclad in 3D
+                </button>
+              </div>
               <p>
                 Actions and arrivals save on this device. The iOS build plays
                 offline.
@@ -591,8 +842,9 @@ export function App() {
                 <summary>Privacy & game information</summary>
                 <p>
                   No accounts, ads, analytics, purchases or remote AI calls.
-                  Progress stays on this device. Starting a new journey replaces
-                  this campaign checkpoint.
+                  Radio streams the original Dream Harbor audio when you press
+                  Play. Progress stays on this device. Starting a new journey
+                  replaces this campaign checkpoint.
                 </p>
                 <p>
                   Canon foundation · development build. Controlled temporary
@@ -776,9 +1028,13 @@ export function App() {
                         : "Supplies reach the mountain."}
                   </h3>
                   <p>
-                    Your choice is saved. Ironclad remains playable. Later
-                    regions are not open in this build.
+                    Your choice is saved. The wider campaign is now open. Meet
+                    the people behind the ledger and earn safe passage through
+                    the Hollow.
                   </p>
+                  <button className="primary" onClick={() => open("contracts")}>
+                    Take the road / Fieldwork →
+                  </button>
                 </div>
               ) : null}
               <button className="text-button" onClick={close}>
