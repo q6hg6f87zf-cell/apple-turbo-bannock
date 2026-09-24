@@ -1,3 +1,7 @@
+import { lazy, Suspense } from "react";
+import { WorkBoard, LocalVoices } from "./WorkBoard";
+import { reconcileLife, WATCHES } from "../game/watches";
+const Casino = lazy(() => import("./Casino"));
 import { MovementPad } from "./MovementPad";
 import {
   Campaign,
@@ -50,6 +54,9 @@ import { WEAPONS } from "../game/domain/registry";
 import { ironcladEffects } from "../game/domain/narrative";
 
 type Panel =
+  | "casino"
+  | "workboard"
+  | "voices"
   | "campaign"
   | "contracts"
   | "settlement"
@@ -105,8 +112,15 @@ export function App() {
     let mounted = true;
     void loadGame().then(({ state: s, warning: w }) => {
       if (mounted) {
-        live.current = s;
-        setState(s);
+        const caughtUp = reconcileLife(s, Date.now());
+        live.current = caughtUp;
+        setState(caughtUp);
+        if (s.started && JSON.stringify(caughtUp) !== JSON.stringify(s))
+          void saveGame(caughtUp).catch(() =>
+            setWarning(
+              "Could not save the returning crew report. Keep the app open.",
+            ),
+          );
         setWarning(w);
         setReady(true);
       }
@@ -187,15 +201,24 @@ export function App() {
           },
         });
     };
+    const catchUp = () => {
+      const s = reconcileLife(live.current, Date.now());
+      if (JSON.stringify(s) !== JSON.stringify(live.current)) commit(s);
+    };
+    const productionTimer = setInterval(catchUp, 30000);
     const visibility = () => {
       if (document.hidden) checkpoint();
-      else if (live.current.settings.sound) unlockSound();
+      else {
+        catchUp();
+        if (live.current.settings.sound) unlockSound();
+      }
     };
     document.addEventListener("visibilitychange", visibility);
     let dead = false;
     let remove: (() => void) | undefined;
     void NativeApp.addListener("appStateChange", ({ isActive }) => {
       if (!isActive) checkpoint();
+      else catchUp();
     })
       .then((handle) => {
         if (dead) void handle.remove();
@@ -210,6 +233,7 @@ export function App() {
       remove?.();
       document.removeEventListener("visibilitychange", visibility);
       clearTimeout(timer.current);
+      clearInterval(productionTimer);
     };
   }, [commit]);
   const begin = () => {
@@ -416,6 +440,12 @@ export function App() {
             </h1>
           </div>
         </div>
+        {expanded ? (
+          <button className="watch-chip" onClick={() => open("workboard")}>
+            Day {state.life.day} · {WATCHES[Math.min(5, state.life.spent)]} ·{" "}
+            {6 - state.life.spent} watches
+          </button>
+        ) : null}
         <button
           className="icon-button"
           aria-label="Settings and pause"
@@ -425,7 +455,11 @@ export function App() {
           Ⅱ
         </button>
       </header>
-      <Radio region={state.player.region} duck={!!panel || !!b} />
+      <Radio
+        region={state.player.region}
+        duck={(!!panel && panel !== "casino") || !!b}
+        casino={panel === "casino"}
+      />
       <section className="vitals" aria-label="Player status">
         <div>
           <span className="rank">{String(level(state)).padStart(2, "0")}</span>
@@ -673,18 +707,26 @@ export function App() {
           <button className="close" aria-label="Close panel" onClick={close}>
             ×
           </button>
-          {["contracts", "settlement", "world", "people"].includes(
-            panel ?? "",
-          ) ? (
+          {[
+            "contracts",
+            "settlement",
+            "world",
+            "people",
+            "casino",
+            "workboard",
+            "voices",
+          ].includes(panel ?? "") ? (
             <p className="panel-notice" role="status">
               {notice}
             </p>
           ) : null}
-          {panel === "campaign" ? (
-            <Campaign state={state} apply={apply} />
+          {panel === "casino" ? (
+            <Suspense fallback={<p>Opening the Thirty-Eight…</p>}>
+              <Casino state={state} apply={apply} />
+            </Suspense>
           ) : null}
-          {panel === "contracts" ? (
-            <Contracts
+          {panel === "workboard" ? (
+            <WorkBoard
               state={state}
               apply={(out) => {
                 apply(out);
@@ -692,8 +734,39 @@ export function App() {
               }}
             />
           ) : null}
+          {panel === "voices" ? (
+            <LocalVoices state={state} apply={apply} />
+          ) : null}
+          {panel === "campaign" ? (
+            <Campaign state={state} apply={apply} />
+          ) : null}
+          {panel === "contracts" ? (
+            <>
+              <button className="text-button" onClick={() => open("workboard")}>
+                Day {state.life.day} / {6 - state.life.spent} watches ·
+                Recurring work & rest →
+              </button>
+              <Contracts
+                state={state}
+                apply={(out) => {
+                  apply(out);
+                  if (out.state.encounters.active) close();
+                }}
+              />
+            </>
+          ) : null}
           {panel === "settlement" ? (
-            <SettlementServices state={state} apply={apply} />
+            <>
+              <nav
+                className="camp-navigation"
+                aria-label="Settlement activities"
+              >
+                <button onClick={() => open("workboard")}>Work board</button>
+                <button onClick={() => open("casino")}>The Thirty-Eight</button>
+                <button onClick={() => open("voices")}>Local voices</button>
+              </nav>
+              <SettlementServices state={state} apply={apply} />
+            </>
           ) : null}
           {panel === "world" ? (
             <WorldMap
@@ -706,7 +779,12 @@ export function App() {
             />
           ) : null}
           {panel === "people" ? (
-            <Relationships state={state} apply={apply} />
+            <>
+              <button className="text-button" onClick={() => open("voices")}>
+                Talk with people here →
+              </button>
+              <Relationships state={state} apply={apply} />
+            </>
           ) : null}
           {panel === "gear" ? <Inventory state={state} apply={apply} /> : null}
           {panel === "journal" ? (
