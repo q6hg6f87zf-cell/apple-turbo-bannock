@@ -183,6 +183,101 @@ test("Vault 13, repair, contracts, memory, faction choice and saved consequences
     "Three sealed water",
   );
   await visualEvidence(page, info.project.name + "-camp");
+  await page.getByRole("button", { name: "Local voices", exact: true }).click();
+  await page
+    .getByRole("button", { name: /I will work the clinic today/ })
+    .click();
+  await expect(page.locator(".decision-record")).toContainText(
+    "put your name down",
+  );
+  await dismiss(page);
+  await page.getByRole("button", { name: "Camp", exact: true }).click();
+  await page.getByRole("button", { name: "Work board", exact: true }).click();
+  const clinic = page.locator(".contract-list article").filter({
+    has: page.getByRole("heading", { name: "The clinic needs a shift" }),
+  });
+  await clinic
+    .getByRole("button", { name: "Work the shift", exact: true })
+    .click();
+  await expect(clinic).toContainText("Completed today");
+  const pumps = page.locator(".contract-list article").filter({
+    has: page.getByRole("heading", { name: "Keep the pumps turning" }),
+  });
+  await pumps.getByRole("button", { name: /Assign local crew/ }).click();
+  await expect(page.locator(".work-active")).toContainText(
+    "Keep the pumps turning",
+  );
+  await expect(
+    page.getByRole("button", { name: /Rest until dawn/ }),
+  ).toBeDisabled();
+  await page.locator(".work-active").scrollIntoViewIfNeeded();
+  await visualEvidence(page, info.project.name + "-work-board");
+  await dismiss(page);
+  await page.getByRole("button", { name: "Camp", exact: true }).click();
+  await page
+    .getByRole("button", { name: "The Thirty-Eight", exact: true })
+    .click();
+  await page.getByRole("button", { name: /Buy 10 chips/ }).click();
+  await page
+    .getByRole("button", { name: "Jacks or Better", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start Jacks or Better", exact: true })
+    .click();
+  await page.locator(".poker-hand button").first().click();
+  const heldCard = await page
+    .locator(".poker-hand button")
+    .first()
+    .getAttribute("aria-label");
+  await visualEvidence(page, info.project.name + "-casino");
+  await page.reload();
+  await page.getByRole("button", { name: /Continue your journey/ }).click();
+  await page.getByRole("button", { name: "Camp", exact: true }).click();
+  await page
+    .getByRole("button", { name: "The Thirty-Eight", exact: true })
+    .click();
+  await expect(page.locator(".poker-hand button").first()).toHaveAttribute(
+    "aria-label",
+    heldCard!,
+  );
+  await expect(page.locator(".poker-hand button").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page
+    .getByRole("button", { name: "Draw replacements", exact: true })
+    .click();
+  await expect(page.locator(".casino-message")).toContainText("chips returned");
+  await page.getByRole("button", { name: "Word search", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Start Word search", exact: true })
+    .click();
+  await expect(page.locator(".search-grid button")).toHaveCount(64);
+  await visualEvidence(page, info.project.name + "-word-search");
+  await page.getByRole("button", { name: /Leave round/ }).click();
+  await page.getByRole("button", { name: "Lockpick", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Start Lockpick", exact: true })
+    .click();
+  await page.getByRole("checkbox", { name: /Manual dial/ }).check();
+  await expect(
+    page.getByRole("slider", { name: "Pick position" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Leave round/ }).click();
+  await dismiss(page);
+  await page.clock.setFixedTime(new Date(Date.now() + 6 * 60_000));
+  await page.reload();
+  await page.getByRole("button", { name: /Continue your journey/ }).click();
+  await page.getByRole("button", { name: "Camp", exact: true }).click();
+  await page.getByRole("button", { name: "Work board", exact: true }).click();
+  await expect(page.locator(".work-active")).toHaveCount(0);
+  await expect(
+    page.locator(".contract-list article").filter({
+      has: page.getByRole("heading", { name: "Keep the pumps turning" }),
+    }),
+  ).toContainText("Completed today");
+  await page.getByRole("button", { name: /Rest until dawn/ }).click();
+  await expect(page.getByRole("dialog")).toContainText("DAY 2");
 
   expect(
     await page.evaluate(
