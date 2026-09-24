@@ -10,7 +10,11 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     launchOptions: {
+      executablePath: process.env.BROWSER_EXECUTABLE_PATH,
       args: [
+        ...(process.env.BROWSER_EXECUTABLE_PATH
+          ? ["--in-process-gpu", "--no-zygote"]
+          : []),
         "--use-gl=angle",
         "--use-angle=swiftshader",
         "--enable-unsafe-swiftshader",
