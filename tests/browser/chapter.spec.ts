@@ -56,8 +56,10 @@ test("Vault 13, repair, contracts, memory, faction choice and saved consequences
   });
   await page.goto("/");
   await page.getByRole("button", { name: /Wake in Vault 13/ }).click();
-  await expect(page.locator("canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Found You", exact: true })).toBeVisible();
+  await expect(page.locator(".journey-backdrop")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Found You", exact: true }),
+  ).toBeVisible();
   await visualEvidence(page, info.project.name + "-vault");
   await continueTo(page);
   await expect(page.locator(".dialogue")).toContainText("Three miles east");
@@ -148,11 +150,40 @@ test("Vault 13, repair, contracts, memory, faction choice and saved consequences
   await page.reload();
   await page.getByRole("button", { name: /Continue your journey/ }).click();
   await expect(
-    page.getByRole("heading", { name: "The road remembers" }),
+    page.getByRole("heading", { name: "The White Witness" }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Loadout/ }).click();
   await expect(page.locator(".weapon-inspect")).toContainText("Rail Peep");
   await visualEvidence(page, info.project.name + "-loadout");
+  await dismiss(page);
+  await page.getByRole("button", { name: "Fieldwork", exact: true }).click();
+  const route = page
+    .locator(".contract-list article")
+    .filter({ has: page.getByRole("heading", { name: "The clinic road" }) });
+  await route.getByRole("button", { name: /Negotiate/ }).click();
+  await expect(route.locator(".completed")).toContainText("negotiated passage");
+  await visualEvidence(page, info.project.name + "-fieldwork");
+  await dismiss(page);
+  await page.getByRole("button", { name: "Story", exact: true }).click();
+  await page.getByRole("button", { name: /The Scrap Manifest/ }).click();
+  await page
+    .getByRole("button", { name: /Let Tyrone choose what to open/ })
+    .click();
+  await expect(page.locator(".decision-record")).toContainText(
+    "Let Tyrone choose",
+  );
+  await visualEvidence(page, info.project.name + "-story-choice");
+  await dismiss(page);
+  await page.getByRole("button", { name: "Camp", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Leave something standing." }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Pack water/ }).click();
+  await expect(page.locator(".panel-notice")).toContainText(
+    "Three sealed water",
+  );
+  await visualEvidence(page, info.project.name + "-camp");
+
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -170,27 +201,12 @@ test("Vault 13, repair, contracts, memory, faction choice and saved consequences
   ).toBe(true);
   expect(errors).toEqual([]);
 });
-test("travel waits for scene loading instead of losing the first tap", async ({
+test("journey remains playable without downloading the 3D renderer", async ({
   page,
 }) => {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/scene-*.js", async (route) => {
-    await gate;
-    await route.continue();
-  });
+  await page.route("**/scene-*.js", (route) => route.abort());
   await page.goto("/");
   await page.getByRole("button", { name: /Wake in Vault 13/ }).click();
-  try {
-    await expect(
-      page.getByRole("button", { name: /Continue journey/ }),
-    ).toBeDisabled();
-    await expect(page.getByRole("button", { name: /Places/ })).toBeDisabled();
-  } finally {
-    release();
-  }
   await expect(
     page.getByRole("button", { name: /Continue journey/ }),
   ).toBeEnabled();
@@ -226,7 +242,7 @@ test("a damaged primary checkpoint recovers the last valid backup", async ({
     "Recovered the previous checkpoint",
   );
   await page.getByRole("button", { name: /Continue your journey/ }).click();
-  await expect(page.locator("canvas")).toBeVisible();
+  await expect(page.locator(".journey-backdrop")).toBeVisible();
 });
 test.afterEach(async ({ page }, info) => {
   if (info.status !== info.expectedStatus) {
@@ -237,4 +253,28 @@ test.afterEach(async ({ page }, info) => {
       await page.evaluate(() => JSON.stringify(localStorage)),
     );
   }
+});
+
+test("optional 3D walking can open and return to the illustrated journey", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: /Wake in Vault 13/ }).click();
+  await page.getByRole("button", { name: "Settings and pause" }).click();
+  await page.getByRole("button", { name: "Walk Ironclad in 3D" }).click();
+  await page.getByRole("button", { name: "Return to the game" }).click();
+  await expect(page.locator("canvas")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Movement joystick" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Centre camera" }).click();
+  await visualEvidence(page, "optional-3d-walk");
+  await page.getByRole("button", { name: "Settings and pause" }).click();
+  await page.getByRole("button", { name: "Illustrated journey" }).click();
+  await page.getByRole("button", { name: "Return to the game" }).click();
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await expect(page.locator(".journey-backdrop")).toBeVisible();
+  expect(errors).toEqual([]);
 });
