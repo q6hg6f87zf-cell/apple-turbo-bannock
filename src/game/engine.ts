@@ -1,66 +1,67 @@
-import { SITES, walkable, type Point, type SiteId } from "./world";
-export type Stage =
-  "wake" | "patrol" | "forge" | "gate" | "decision" | "complete";
-export type Action = "strike" | "guard" | "pulse" | "heal" | "retreat";
-export type Battle = {
-  enemy: "scout" | "warden";
-  hp: number;
-  maxHp: number;
-  turn: number;
-  exposed: boolean;
+import { SITES, type SiteId } from "./world";
+import type { Save, Battle, AmmoGrade } from "./domain/types";
+import { initial, level, maxHp } from "./domain/state";
+import {
+  activeWeapon,
+  addAmmo,
+  grantWeapon,
+  grantItem,
+  reloadWeapon,
+  weaponDamage,
+  fireWeapon,
+  protection,
+  installNext,
+  conditionName,
+} from "./domain/inventory";
+import { WEAPONS, ITEMS } from "./domain/registry";
+import {
+  changeFaction,
+  discover,
+  remember,
+  shareEvidence,
+  ironcladEffects,
+} from "./domain/narrative";
+import { OBJECTIVES } from "./regions/ironclad";
+export { initial, level, maxHp };
+export { parseSave } from "./domain/save";
+export type { Save, Battle };
+export type Action =
+  "strike" | "guard" | "aim" | "heal" | "reload" | "swap" | "retreat";
+import { result, note, type Outcome } from "./domain/outcome";
+export type { Outcome };
+import { ironcladInteract } from "./regions/ironclad-rules";
+export {
+  utilityShot,
+  workshop,
+  settle,
+  buyAmmo,
+  respondToTyrone,
+} from "./regions/ironclad-rules";
+const REGION_HANDLERS: Partial<
+  Record<
+    Save["player"]["region"],
+    {
+      interact: (s: Save, id: SiteId) => Outcome;
+      objective: (s: Save) => typeof OBJECTIVES.wake;
+    }
+  >
+> = {
+  ironclad: {
+    interact: ironcladInteract,
+    objective: (s) => OBJECTIVES[s.progression.phase],
+  },
 };
-export type Save = {
-  version: 1;
-  started: boolean;
-  stage: Stage;
-  position: Point;
-  hp: number;
-  xp: number;
-  scrap: number;
-  core: boolean;
-  coil: boolean;
-  armour: boolean;
-  cache: boolean;
-  relay: boolean;
-  meds: number;
-  energy: number;
-  battle: Battle | null;
-  ending: "broadcast" | "conceal" | null;
-  journal: string[];
-  settings: { sound: boolean; haptics: boolean; reducedMotion: boolean };
+export const objective = (s: Save) =>
+  REGION_HANDLERS[s.player.region]?.objective(s) ?? OBJECTIVES.complete;
+export const interact = (s: Save, id: SiteId) =>
+  REGION_HANDLERS[s.player.region]?.interact(s, id) ??
+  result(s, "This region is not open in this build.");
+export const damage = (s: Save) => {
+  const w = activeWeapon(s);
+  return w ? weaponDamage(w) : 0;
 };
-export type Outcome = {
-  state: Save;
-  text: string;
-  kind: "info" | "hit" | "guard" | "heal" | "win" | "upgrade" | "defeat";
-  damage?: number;
-  incoming?: number;
-};
-export const initial = (): Save => ({
-  version: 1,
-  started: false,
-  stage: "wake",
-  position: { x: 0, z: 13 },
-  hp: 30,
-  xp: 0,
-  scrap: 0,
-  core: false,
-  coil: false,
-  armour: false,
-  cache: false,
-  relay: false,
-  meds: 2,
-  energy: 3,
-  battle: null,
-  ending: null,
-  journal: [],
-  settings: { sound: true, haptics: true, reducedMotion: false },
-});
-export const level = (s: Save) => (s.xp >= 150 ? 3 : s.xp >= 60 ? 2 : 1);
-export const maxHp = (s: Save) => 30 + (level(s) - 1) * 4;
-export const damage = (s: Save) => 6 + (s.coil ? 2 : 0) + (level(s) - 1);
 export const enemyName = (b: Battle) =>
-  b.enemy === "scout" ? "Rail Cut sentry" : "Gate Warden";
+  b.enemy === "scout" ? "Recovery contract guard" : "Rail recovery enforcer";
 export type EnemyTurn = {
   name: string;
   phase: string;
@@ -70,508 +71,268 @@ export type EnemyTurn = {
   heavy: boolean;
   hint: string;
 };
-/** One source of truth for telegraphs, damage rules and action forecasts. */
+/** Shared telegraph + deterministic response drives UI forecasts and tests. */
 export function enemyTurn(b: Battle): EnemyTurn {
-  if (b.enemy === "scout")
+  if (b.pattern === "sentinel")
     return {
-      name: b.turn % 2 ? "Heavy shot" : "Charging",
-      phase: "RAIL CUT SENTRY",
+      name: b.turn % 2 ? "Heavy shot" : "Taking aim",
+      phase: "RAIL CUT / CONTRACT GUARD",
       incoming: b.turn % 2 ? 9 : 0,
       armour: 0,
       vulnerable: false,
       heavy: b.turn % 2 === 1,
       hint:
         b.turn % 2
-          ? "Guard absorbs 8. Finish the sentry to stop its shot."
-          : "A safe opening to attack or recover.",
+          ? "Guard absorbs 8. A finishing shot prevents retaliation."
+          : "A safe opening to fire, reload or recover.",
     };
-  const damaged = b.hp <= b.maxHp / 2;
-  const phase = damaged ? "PHASE 02 / OVERDRIVE" : "PHASE 01 / LOCKDOWN";
-  switch (b.turn % 4) {
-    case 0:
-      return {
-        name: damaged ? "Suppression burst" : "Armoured advance",
-        phase,
-        incoming: damaged ? 6 : 4,
-        armour: 6,
-        vulnerable: false,
-        heavy: false,
-        hint: "Guard the burst or pulse through the reinforced armour.",
-      };
-    case 1:
-      return {
-        name: "Cannon wind-up",
-        phase,
-        incoming: 0,
-        armour: 3,
-        vulnerable: false,
-        heavy: false,
-        hint: "Prime the target with a pulse. A second pulse can interrupt the heavy shot.",
-      };
-    case 2:
-      return {
-        name: "Heavy shot",
-        phase,
-        incoming: damaged ? 16 : 14,
-        armour: 3,
-        vulnerable: false,
-        heavy: true,
-        hint: b.exposed
-          ? "Exposed: pulse again to interrupt the cannon, or guard."
-          : "Guard now. An exposed target can be interrupted with a pulse.",
-      };
-    default:
-      return {
-        name: "Cooling vents open",
-        phase,
-        incoming: 0,
-        armour: 0,
-        vulnerable: true,
-        heavy: false,
-        hint: "Strike the open vents for +4 damage, or recover before the next cycle.",
-      };
-  }
+  const hurt = b.hp <= b.maxHp / 2,
+    phase = hurt ? "PHASE 02 / DESPERATE PUSH" : "PHASE 01 / PLATE COVER";
+  const turns: EnemyTurn[] = [
+    {
+      name: "Armoured advance",
+      phase,
+      incoming: hurt ? 6 : 4,
+      armour: 6,
+      vulnerable: false,
+      heavy: false,
+      hint: "Plate absorbs ordinary shots. An aimed shot targets an exposed seam.",
+    },
+    {
+      name: "Heavy shot wind-up",
+      phase,
+      incoming: 0,
+      armour: 3,
+      vulnerable: false,
+      heavy: false,
+      hint: "Aim to expose the firing arm. Aim again during the heavy shot to interrupt.",
+    },
+    {
+      name: "Heavy shot",
+      phase,
+      incoming: hurt ? 16 : 14,
+      armour: 3,
+      vulnerable: false,
+      heavy: true,
+      hint: b.exposed
+        ? "Exposed: aim again to interrupt, or guard."
+        : "Guard now. A previously exposed firing arm can be interrupted.",
+    },
+    {
+      name: "Reloading / flank open",
+      phase,
+      incoming: 0,
+      armour: 0,
+      vulnerable: true,
+      heavy: false,
+      hint: "Fire at the open flank, reload, or treat an injury.",
+    },
+  ];
+  return turns[b.turn % 4];
 }
 export const intent = (b: Battle) => {
-  const turn = enemyTurn(b);
-  return `${turn.name}${turn.incoming ? ` — ${turn.incoming} damage incoming.` : "."} ${turn.hint}`;
+  const t = enemyTurn(b);
+  return `${t.name}${t.incoming ? ` — ${t.incoming} damage incoming.` : "."} ${t.hint}`;
 };
 export function strikeDamage(s: Save): number {
-  const turn = s.battle ? enemyTurn(s.battle) : null;
+  const w = activeWeapon(s);
+  if (!w) return 0;
+  const d = WEAPONS[w.definition],
+    t = s.encounters.active ? enemyTurn(s.encounters.active) : null;
+  if (d.family === "bb" && (t?.armour ?? 0) > 0) return 0;
   return (
-    Math.max(1, damage(s) - (turn?.armour ?? 0)) +
-    (s.battle?.exposed ? 4 : 0) +
-    (turn?.vulnerable ? 4 : 0)
+    Math.max(
+      1,
+      weaponDamage(w) - Math.max(0, (t?.armour ?? 0) - d.penetration),
+    ) +
+    (s.encounters.active?.exposed && d.family !== "bb" ? 4 : 0) +
+    (t?.vulnerable && d.family !== "bb" ? 4 : 0)
   );
 }
-export function actionForecast(s: Save, action: Action): string {
-  if (!s.battle) return "";
-  if (action === "pulse" && (!s.coil || s.energy < 2))
-    return s.coil ? "Needs 2 charge" : "Fit a coil to unlock";
-  if (action === "heal" && (!s.meds || s.hp === maxHp(s)))
-    return s.meds ? "Health full" : "No medkits";
-  const out = act(s, action);
+export function actionBlocked(s: Save, a: Action): string {
+  const w = activeWeapon(s),
+    d = w && WEAPONS[w.definition];
+  if ((a === "strike" || a === "aim") && (!w || !w.condition))
+    return "Equip a functioning weapon";
+  if ((a === "strike" || a === "aim") && d?.caliber && !w!.loaded.rounds)
+    return "Reload first";
+  if (
+    a === "aim" &&
+    (s.player.focus < 2 || !w || w.condition < 35 || !w.mods.optic)
+  )
+    return "Needs fitted peep, working condition and 2 focus";
+  if (
+    a === "heal" &&
+    (!s.inventory.supplies.medicine || s.player.hp === maxHp(s))
+  )
+    return s.inventory.supplies.medicine ? "Health full" : "No Field Gel";
+  if (
+    a === "reload" &&
+    (!d?.caliber ||
+      !w!.condition ||
+      w!.loaded.rounds === d.capacity ||
+      !(s.inventory.ammo[d.caliber]?.[w!.loaded.grade] ?? 0))
+  )
+    return "No matching reserve or already loaded";
+  if (a === "swap" && (!s.loadout.melee || !s.loadout.primary))
+    return "No second weapon";
+  return "";
+}
+export function actionForecast(s: Save, a: Action): string {
+  if (!s.encounters.active) return "";
+  const blocked = actionBlocked(s, a);
+  if (blocked) return blocked;
+  const out = act(s, a);
   if (out.kind === "defeat") return "Lethal response · returns you to safety";
   if (out.kind === "win") return `${out.damage} damage · finishes encounter`;
-  const hit =
-    action === "heal"
-      ? `Heal ${Math.min(16, maxHp(s) - s.hp)}`
-      : action === "guard"
-        ? "Block 8 · +2 charge"
-        : `${out.damage} damage`;
-  return `${hit} · ${out.incoming ? `take ${out.incoming}` : "no damage taken"}`;
+  const prefix =
+    a === "guard"
+      ? "Block 8 · +2 focus"
+      : a === "heal"
+        ? `Heal ${Math.min(16, maxHp(s) - s.player.hp)}`
+        : a === "reload"
+          ? "Load matching ammunition"
+          : a === "swap"
+            ? "Swap weapon"
+            : `${out.damage ?? 0} damage`;
+  return `${prefix} · ${out.incoming ? `take ${out.incoming}` : "no damage taken"}`;
 }
-export function objective(s: Save): {
-  title: string;
-  body: string;
-  target: SiteId;
-  step: number;
-} {
-  switch (s.stage) {
-    case "wake":
-      return {
-        title: "A voice in the rust",
-        body: "Meet Tyrone on the street.",
-        target: "tyrone",
-        step: 1,
-      };
-    case "patrol":
-      return {
-        title: "Something worth fighting for",
-        body: "Recover a power core from the Rail Cut patrol.",
-        target: "scout",
-        step: 2,
-      };
-    case "forge":
-      return {
-        title: "Make it yours",
-        body: "Take the recovered core to Travis’s workshop.",
-        target: "workshop",
-        step: 3,
-      };
-    case "gate":
-      return {
-        title: "Break the blockade",
-        body: "Use your coil rifle against the Gate Warden.",
-        target: "warden",
-        step: 4,
-      };
-    case "decision":
-      return {
-        title: "What the Hollow remembers",
-        body: "Reach the Iron Gate. Decide who gets the evidence.",
-        target: "gate",
-        step: 5,
-      };
-    case "complete":
-      return {
-        title: "A road of your own",
-        body: "Chapter complete. Explore, collect supplies, or visit Travis.",
-        target: "workshop",
-        step: 5,
-      };
-  }
+export const inVault = (s: Save) =>
+  ["wake", "water", "board"].includes(s.progression.phase);
+export function siteAvailable(s: Save, id: SiteId): boolean {
+  if (inVault(s)) return ["tyrone", "cache", "board"].includes(id);
+  return id !== "board";
 }
-const result = (
-  state: Save,
-  text: string,
-  kind: Outcome["kind"] = "info",
-  extra: Partial<Outcome> = {},
-): Outcome => ({ state, text, kind, ...extra });
-const note = (s: Save, text: string) => {
-  s.journal = [...s.journal, text].slice(-30);
-};
-export function interact(input: Save, id: SiteId): Outcome {
+export function equip(input: Save, id: string): Outcome {
   const s = structuredClone(input),
-    site = SITES.find((p) => p.id === id)!;
-  if (s.battle) return result(s, "Finish the encounter or retreat first.");
-  if (Math.hypot(s.position.x - site.x, s.position.z - site.z) > 2.2)
-    return result(s, "Move closer to interact.");
-  if (id === "tyrone") {
-    if (s.stage === "wake") {
-      s.stage = "patrol";
-      note(
-        s,
-        "Tyrone found me outside Vault 13. A patrol at the Rail Cut carries a core Travis can fit to my rifle.",
-      );
-    }
-    return result(
-      s,
-      "Well, you’re upright. That puts you ahead of half this town. Patrol up the road has a power core. Travis has a use for it. Try to come back with both your hands.",
-    );
-  }
-  if (id === "cache") {
-    if (s.cache)
-      return result(s, "Picked clean. You already recovered these supplies.");
-    s.cache = true;
-    s.scrap += 3;
-    s.meds += 1;
-    note(s, "Found a hidden supply cache: 3 scrap and a medkit.");
-    return result(
-      s,
-      "Recovered 3 scrap and 1 medkit. Exploration pays.",
-      "win",
-    );
-  }
-  if (id === "scout") {
-    if (s.stage === "wake")
-      return result(
-        s,
-        "Tyrone waves you over. Hear him out before approaching the patrol.",
-      );
-    if (s.stage !== "patrol")
-      return result(
-        s,
-        "The patrol is gone. Its power core belongs to you now.",
-      );
-    s.battle = { enemy: "scout", hp: 24, maxHp: 24, turn: 0, exposed: false };
-    s.energy = 3;
-    return result(
-      s,
-      "The sentry raises its rifle. Watch its intent; guard when the heavy shot is coming.",
-    );
-  }
-  if (id === "workshop")
-    return result(
-      s,
-      s.core
-        ? "That core still has a heartbeat. I can seat it on your rifle. You’ll feel the difference."
-        : s.coil
-          ? "Good work. That coil is yours now. Bring me four scrap and I’ll reinforce your coat."
-          : "Bring me the patrol’s power core. I’ll make that rifle worth carrying.",
-    );
-  if (id === "relay") {
-    if (s.stage === "wake" || s.stage === "patrol")
-      return result(s, "The relay needs the patrol’s access key.");
-    if (s.relay)
-      return result(
-        s,
-        "The evidence is secure: Kane’s shipment is marked PROJECT VESPER.",
-      );
-    s.relay = true;
-    s.scrap += 2;
-    s.xp += 20;
-    note(
-      s,
-      "Recovered Project Vesper shipping records. Kane is moving people through the Iron Gate.",
-    );
-    return result(
-      s,
-      "PROJECT VESPER. These aren’t machinery manifests. They’re names. Evidence recovered · +20 XP · +2 scrap. Its firing schematics reveal a weak point: start the Warden encounter with 4 charge and an exposed target.",
-      "win",
-    );
-  }
-  if (id === "warden") {
-    if (s.stage === "decision" || s.stage === "complete")
-      return result(s, "The Warden is down. The road is open.");
-    if (!s.coil)
-      return result(
-        s,
-        "That armour will turn your rounds. Have Travis fit the power core first.",
-      );
-    s.battle = { enemy: "warden", hp: 46, maxHp: 46, turn: 0, exposed: false };
-    s.energy = s.relay ? 4 : 3;
-    if (s.relay) s.battle.exposed = true;
-    return result(
-      s,
-      "The Warden locks onto you. Coil pulse bypasses armour and exposes the target for your next strike.",
-    );
-  }
-  if (s.stage === "decision")
-    return result(
-      s,
-      s.relay
-        ? "You have the records and an open transmitter. Tell Ironclad, or keep the evidence hidden?"
-        : "The Warden’s recorder carries Vesper’s manifests. Tell Ironclad, or keep the evidence hidden?",
-    );
+    w = s.inventory.weapons[id];
+  if (s.encounters.active)
+    return result(s, "Use Swap in combat; changing weapons costs a turn.");
+  if (!w || w.owner !== "player")
+    return result(s, "That weapon is not in your pack.");
+  const d = WEAPONS[w.definition];
+  const slot =
+    d.caliber === null
+      ? "melee"
+      : ["pistol", "revolver", "compact"].includes(d.family)
+        ? "sidearm"
+        : "primary";
+  s.loadout[slot] = id;
+  s.loadout.active = id;
+  return result(s, `${d.name} equipped. ${conditionName(w.condition)}.`);
+}
+export function reload(input: Save, grade: AmmoGrade = "Ball"): Outcome {
+  const s = structuredClone(input);
+  if (s.encounters.active) return result(s, "Reloading costs a combat turn.");
   return result(
     s,
-    s.stage === "complete"
-      ? "The gate is open. Ironclad will remember your choice."
-      : "The Gate Warden still controls this road.",
-  );
-}
-export function upgrade(input: Save, kind: "coil" | "armour"): Outcome {
-  const s = structuredClone(input),
-    shop = SITES.find((p) => p.id === "workshop")!;
-  if (
-    s.battle ||
-    Math.hypot(s.position.x - shop.x, s.position.z - shop.z) > 2.2
-  )
-    return result(s, "Visit Travis’s workshop to upgrade.");
-  if (kind === "coil") {
-    if (!s.core || s.coil) return result(s, "Recover the patrol’s core first.");
-    s.core = false;
-    s.coil = true;
-    s.stage = "gate";
-    s.xp += 20;
-    s.hp = maxHp(s);
-    note(
-      s,
-      "Travis fitted the Ironbound Coil. My rifle now fires an armour-piercing pulse.",
-    );
-    return result(
-      s,
-      "IRONBOUND COIL FITTED. +2 strike damage. Coil pulse unlocked. Rifle appearance changed. Rank 2 · health restored.",
-      "upgrade",
-    );
-  }
-  if (s.armour || s.scrap < 4)
-    return result(
-      s,
-      s.armour
-        ? "Your coat is already reinforced."
-        : "You need 4 scrap. Search the cache and the signal relay.",
-    );
-  s.scrap -= 4;
-  s.armour = true;
-  note(
-    s,
-    "Travis reinforced my coat with shoulder plates. Incoming damage reduced by 2.",
-  );
-  return result(
-    s,
-    "RIVETGUARD PLATES FITTED. Incoming damage −2. Your shoulder armour is now visible.",
-    "upgrade",
+    s.loadout.active && reloadWeapon(s, s.loadout.active, grade)
+      ? "Loaded compatible ammunition."
+      : "No compatible rounds available, or already full.",
   );
 }
 export function act(input: Save, action: Action): Outcome {
   const s = structuredClone(input),
-    b = s.battle;
+    b = s.encounters.active;
   if (!b) return result(s, "No active encounter.");
   if (action === "retreat") {
-    s.battle = null;
-    s.position = { x: 0, z: 12 };
+    s.encounters.active = null;
+    s.player.position = { x: 0, z: 12 };
     return result(
       s,
-      "You withdrew to Vault 13. The enemy recovers; your gear and progress are safe.",
+      "Tyrone guides you back to safety. The crew regroups; your equipment and evidence remain.",
     );
   }
-  if (action === "pulse" && (!s.coil || s.energy < 2))
-    return result(
-      s,
-      "Coil pulse needs 2 charge. Strike restores 1; guard restores 2.",
-    );
-  if (action === "heal" && (s.meds < 1 || s.hp >= maxHp(s)))
-    return result(
-      s,
-      s.meds < 1 ? "No medkits left." : "Health is already full.",
-    );
-  const turn = enemyTurn(b);
-  const interrupted = action === "pulse" && b.exposed && turn.heavy;
+  const blocked = actionBlocked(s, action);
+  if (blocked) return result(s, blocked);
+  const turn = enemyTurn(b),
+    w = activeWeapon(s)!;
   let dealt = 0,
     absorbed = 0,
     text = "";
+  const interrupted = action === "aim" && b.exposed && turn.heavy;
   if (action === "strike") {
     dealt = strikeDamage(s);
+    fireWeapon(w);
     b.exposed = false;
-    s.energy = Math.min(4, s.energy + 1);
-    text = `Strike hits for ${dealt}. +1 charge.`;
+    s.player.focus = Math.min(4, s.player.focus + 1);
+    text = `Shot lands for ${dealt}.`;
   }
-  if (action === "pulse") {
-    dealt = 12;
-    s.energy -= 2;
+  if (action === "aim") {
+    dealt = WEAPONS[w.definition].family === "bb" ? 0 : weaponDamage(w) + 4;
+    fireWeapon(w);
+    s.player.focus -= 2;
     b.exposed = !interrupted;
     text = interrupted
-      ? "CANNON INTERRUPTED. Coil pulse hits for 12. The heavy shot is cancelled."
-      : "Coil pulse hits for 12. Armour bypassed. Target exposed: next strike +4, or pulse during a heavy shot to interrupt.";
+      ? `HEAVY SHOT INTERRUPTED. ${dealt} damage.`
+      : `Firing arm exposed. ${dealt} damage. A second aimed shot during the heavy wind-up response can interrupt.`;
   }
   if (action === "guard") {
     absorbed = 8;
-    s.energy = Math.min(4, s.energy + 2);
-    text = "Braced. Absorb 8 damage this turn. +2 charge.";
+    s.player.focus = Math.min(4, s.player.focus + 2);
+    text = "Braced. Block 8; recover 2 focus.";
   }
   if (action === "heal") {
-    s.meds--;
-    s.hp = Math.min(maxHp(s), s.hp + 16);
-    text = "Medkit applied. Recovered up to 16 health.";
+    s.inventory.supplies.medicine--;
+    s.player.hp = Math.min(maxHp(s), s.player.hp + 16);
+    text = "Field Gel applied.";
+  }
+  if (action === "reload") {
+    reloadWeapon(s, w.id, w.loaded.grade);
+    text = "Reloaded. Watch the response.";
+  }
+  if (action === "swap") {
+    s.loadout.active =
+      s.loadout.active === s.loadout.melee
+        ? s.loadout.primary
+        : s.loadout.melee;
+    text = "Weapon swapped; the enemy uses the opening.";
   }
   b.hp = Math.max(0, b.hp - dealt);
-  if (b.hp === 0) {
-    const isBoss = b.enemy === "warden";
-    s.battle = null;
-    s.xp += isBoss ? 80 : 40;
-    s.scrap += isBoss ? 4 : 2;
-    s.stage = isBoss ? "decision" : "forge";
-    if (!isBoss) s.core = true;
-    s.hp = Math.min(maxHp(s), s.hp + 8);
-    text = isBoss
-      ? "WARDEN DOWN. +80 XP · +4 scrap · +8 health. The gate is yours."
-      : "CORE RECOVERED. +40 XP · +2 scrap · +8 health. Bring it to Travis.";
+  if (!b.hp) {
+    s.encounters.active = null;
+    s.encounters.resolved.push(b.enemy);
+    if (b.enemy === "scout") {
+      const key = grantItem(s, "recovery-warrant", "rail-warrant", "vesper");
+      if (key) s.loadout.authority = key;
+    }
+    s.progression.phase = b.enemy === "scout" ? "ledger" : "settlement";
+    s.player.xp += b.enemy === "scout" ? 40 : 80;
+    s.inventory.supplies.scrap += b.enemy === "scout" ? 5 : 4;
+    s.player.hp = Math.min(maxHp(s), s.player.hp + 8);
+    text =
+      b.enemy === "scout"
+        ? "The guard withdraws. Recovery warrant secured; five scrap recovered. Bring the paperwork to Rourke."
+        : "The enforcer drops his shotgun and withdraws. The gate is open. The contract still needs a settlement.";
     note(s, text);
     return result(s, text, "win", { damage: dealt, incoming: 0 });
   }
-  const raw = interrupted ? 0 : turn.incoming;
-  const incoming = Math.max(0, raw - absorbed - (s.armour ? 2 : 0));
-  s.hp = Math.max(0, s.hp - incoming);
+  const incoming = Math.max(
+    0,
+    (interrupted ? 0 : turn.incoming) - absorbed - protection(s),
+  );
+  s.player.hp = Math.max(0, s.player.hp - incoming);
   b.turn++;
-  text += incoming
-    ? ` You take ${incoming} damage.`
-    : raw
-      ? " The shot is absorbed."
-      : interrupted
-        ? " The cannon falls silent."
-        : " You used the opening safely.";
-  if (s.hp === 0) {
-    s.hp = maxHp(s);
-    s.position = { x: 0, z: 12 };
-    s.battle = null;
-    s.meds = Math.max(1, s.meds);
-    note(s, "Tyrone dragged me back to Vault 13. My gear survived.");
+  if (!s.player.hp) {
+    s.player.hp = maxHp(s);
+    s.player.position = { x: 0, z: 12 };
+    s.encounters.active = null;
+    s.inventory.supplies.medicine = Math.max(1, s.inventory.supplies.medicine);
+    note(
+      s,
+      "Tyrone brought me back to the shelter. My gear and evidence survived.",
+    );
     return result(
       s,
-      "Tyrone hauled you to safety. Health restored. Gear kept. Rethink the enemy’s attack pattern and try again.",
+      "Tyrone hauls you to safety. Health restored; gear and progress kept.",
       "defeat",
       { damage: dealt, incoming },
     );
   }
   return result(
     s,
-    text,
+    `${text} ${incoming ? `You take ${incoming} damage.` : "No damage taken."}`,
     action === "guard" ? "guard" : action === "heal" ? "heal" : "hit",
     { damage: dealt, incoming },
   );
-}
-export function chooseEnding(
-  input: Save,
-  choice: "broadcast" | "conceal",
-): Outcome {
-  const s = structuredClone(input);
-  if (
-    s.stage !== "decision" ||
-    Math.hypot(s.position.x, s.position.z + 19) > 2.2
-  )
-    return result(s, "Reach the Iron Gate after defeating the Warden.");
-  s.ending = choice;
-  s.stage = "complete";
-  s.xp += 30;
-  const text =
-    choice === "broadcast"
-      ? "The names go out over Ironclad radio. Workshop lights turn blue in solidarity. Kane knows someone survived."
-      : "The transmitter falls silent. You keep the manifests and leave by the unlit road. Kane does not know what you carry.";
-  note(s, text);
-  return result(s, text, "win");
-}
-/** Reject malformed/future saves rather than constructing impossible progression. */
-export function parseSave(raw: string | null): Save | null {
-  if (!raw) return null;
-  try {
-    const s = JSON.parse(raw) as Save;
-    if (
-      s.version !== 1 ||
-      !["wake", "patrol", "forge", "gate", "decision", "complete"].includes(
-        s.stage,
-      )
-    )
-      return null;
-    if (
-      !s.position ||
-      !Number.isFinite(s.position.x) ||
-      !Number.isFinite(s.position.z) ||
-      !walkable(s.position)
-    )
-      return null;
-    for (const k of ["hp", "xp", "scrap", "meds", "energy"] as const)
-      if (!Number.isInteger(s[k]) || s[k] < 0 || s[k] > 100000) return null;
-    for (const k of [
-      "started",
-      "core",
-      "coil",
-      "armour",
-      "cache",
-      "relay",
-    ] as const)
-      if (typeof s[k] !== "boolean") return null;
-    if (
-      !s.settings ||
-      ["sound", "haptics", "reducedMotion"].some(
-        (k) => typeof s.settings[k as keyof Save["settings"]] !== "boolean",
-      )
-    )
-      return null;
-    if (
-      !Array.isArray(s.journal) ||
-      s.journal.length > 30 ||
-      s.journal.some((t) => typeof t !== "string" || t.length > 2000)
-    )
-      return null;
-    if (s.ending !== null && s.ending !== "broadcast" && s.ending !== "conceal")
-      return null;
-    if (s.hp <= 0 || s.hp > maxHp(s) || s.energy > 4) return null;
-    if (
-      s.battle !== null &&
-      (typeof s.battle !== "object" || Array.isArray(s.battle))
-    )
-      return null;
-    if (s.core && s.coil) return null;
-    if (s.stage === "forge" && !s.core) return null;
-    if (["wake", "patrol"].includes(s.stage) && (s.core || s.coil || s.relay))
-      return null;
-    if (s.stage !== "complete" && s.ending !== null) return null;
-    if (["gate", "decision", "complete"].includes(s.stage) && !s.coil)
-      return null;
-    if (s.stage === "complete" && !s.ending) return null;
-    if (s.battle) {
-      const b = s.battle;
-      if (
-        !["scout", "warden"].includes(b.enemy) ||
-        !Number.isInteger(b.turn) ||
-        b.turn < 0 ||
-        typeof b.exposed !== "boolean" ||
-        !Number.isInteger(b.hp) ||
-        b.hp <= 0 ||
-        b.hp > b.maxHp ||
-        b.maxHp !== (b.enemy === "warden" ? 46 : 24)
-      )
-        return null;
-      if (
-        (b.enemy === "warden" && s.stage !== "gate") ||
-        (b.enemy === "scout" && s.stage !== "patrol")
-      )
-        return null;
-    }
-    return s;
-  } catch {
-    return null;
-  }
 }

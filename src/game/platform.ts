@@ -2,7 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { initial, parseSave, type Save } from "./engine";
-const KEY = "hollow-bannock-save-v1";
+const KEY = "hollow-bannock-save-v2";
 let queue = Promise.resolve();
 export async function loadGame(): Promise<{ state: Save; warning: string }> {
   try {
@@ -20,7 +20,13 @@ export async function loadGame(): Promise<{ state: Save; warning: string }> {
           : "The saved game could not be read. A fresh game is ready; the original save remains in storage until you begin.",
       };
     }
-    return { state: initial(), warning: "" };
+    const legacy = await Preferences.get({ key: "hollow-bannock-save-v1" });
+    return {
+      state: initial(),
+      warning: legacy.value
+        ? "The canon campaign uses a new save format. Your First Light checkpoint is preserved separately; begin a new journey in Vault 13."
+        : "",
+    };
   } catch {
     return {
       state: initial(),

@@ -1,6 +1,15 @@
 export type Point = { x: number; z: number };
 export type SiteId =
-  "tyrone" | "cache" | "scout" | "workshop" | "relay" | "warden" | "gate";
+  | "tyrone"
+  | "cache"
+  | "scout"
+  | "workshop"
+  | "relay"
+  | "enforcer"
+  | "gate"
+  | "board"
+  | "berm"
+  | "market";
 export const SITES: {
   id: SiteId;
   name: string;
@@ -19,7 +28,7 @@ export const SITES: {
   },
   {
     id: "cache",
-    name: "Supply cache",
+    name: "Water & supplies",
     label: "SCAVENGE",
     x: -4,
     z: 7,
@@ -27,7 +36,7 @@ export const SITES: {
   },
   {
     id: "scout",
-    name: "Rail Cut patrol",
+    name: "Rail Cut",
     label: "FIRST CONTACT",
     x: 1,
     z: 2,
@@ -35,7 +44,7 @@ export const SITES: {
   },
   {
     id: "workshop",
-    name: "Travis’s workshop",
+    name: "Travis / Bay 13",
     label: "BUILD & REPAIR",
     x: -4,
     z: -5,
@@ -50,8 +59,8 @@ export const SITES: {
     color: "#7fd7ce",
   },
   {
-    id: "warden",
-    name: "Gate Warden",
+    id: "enforcer",
+    name: "Recovery blockade",
     label: "ARMOURED TARGET",
     x: 0,
     z: -15,
@@ -65,14 +74,38 @@ export const SITES: {
     z: -19,
     color: "#e5bd79",
   },
+  {
+    id: "board",
+    name: "Vault board",
+    label: "TOOLS & ROUTES",
+    x: 3,
+    z: 7,
+    color: "#e5bd79",
+  },
+  {
+    id: "berm",
+    name: "West Berm",
+    label: "WHITE GLINT",
+    x: -4,
+    z: -11,
+    color: "#eeeeee",
+  },
+  {
+    id: "market",
+    name: "Market",
+    label: "FREE ROUTE SUPPLIES",
+    x: 4,
+    z: -3,
+    color: "#e5bd79",
+  },
 ];
 export const BUILDINGS = [
   { x: -9, z: 11, w: 6, d: 7, h: 5, label: "VAULT 13" },
   { x: 9, z: 10, w: 6, d: 9, h: 7, label: "FOUNDRY" },
   { x: -9, z: 1, w: 6, d: 6, h: 4, label: "STORES" },
   { x: 9, z: 0, w: 6, d: 6, h: 5, label: "IRONCLAD" },
-  { x: -9, z: -8, w: 6, d: 8, h: 4, label: "TRAVIS / REPAIRS" },
-  { x: 9, z: -10, w: 6, d: 9, h: 8, label: "VESPER" },
+  { x: -9, z: -8, w: 6, d: 8, h: 4, label: "MACHINE SHOP / BAY 13" },
+  { x: 9, z: -10, w: 6, d: 9, h: 8, label: "RAIL OFFICE" },
 ];
 export function walkable(p: Point): boolean {
   return (

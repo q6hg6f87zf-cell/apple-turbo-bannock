@@ -1,19 +1,17 @@
-# Selective migration
+# Selective canon migration
 
-Source: `q6hg6f87zf-cell/apple-turbo-dream-harbor` at `ef95da0e1815539b6c4a25abd6919aa67a16d094`.
+Continues First Light at `e8859936`, with the canon audit at `a6566b2`. The Historical Canon v3 and Arsenal / Inventory / Equipment Canon v1 supersede provisional story and equipment.
 
-## Carried forward
+## Artwork
 
-| Source                                                      | Destination                     | Purpose                                                       |
-| ----------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------- |
-| `public/art/title-wide.jpg`                                 | `public/art/ironclad-title.jpg` | Start-screen world identity                                   |
-| `public/art/opening/tyrone-portrait.jpg`                    | `public/art/tyrone.jpg`         | Tyrone dialogue identity                                      |
-| `public/art/npcs/portraits/travis.jpg`                      | `public/art/travis.jpg`         | Workshop speaker identity                                     |
-| Ironclad, Vault 13, Tyrone, Travis, Project Vesper          | Explicit opening chapter        | Existing setting and character continuity                     |
-| Weapon modifications, armour trade-offs, telegraphed combat | New pure engine                 | Retained useful design ideas with much smaller implementation |
+`CANONICAL-ART-MANIFEST.md` is the authoritative 68-file inventory, with exact donor paths, runtime consumers and SHA-256 hashes. Files were copied byte-for-byte from the documented Dream Harbor snapshot. The old `ironclad-title.jpg` and remapped `travis.jpg` are removed. The title uses `art/places/ironclad-street.jpg`; Tyrone uses `art/tyrone.jpg`; Travis uses his canonical portrait path.
 
-No old source modules were copied into the runtime. The legacy UI, economy, authentication, migrations, casino, store, AI calls, large video library, and unrelated regions are not dependencies of this chapter. Old saves are NOT imported: the schemas and progression differ materially.
+The hash tests establish identity with the pinned runtime source, not independent proof of which revision is currently deployed at thehollowrealm.com. Three-dimensional characters and architecture remain gameplay proxies, not final fidelity-matched models.
 
-The model is a newly constructed stylized diorama, not the old illustrated regional map. Tyrone retains a single wheel and CRT face. These models are a new visual interpretation, not fidelity-matched production character assets. The existing story names are retained; this specific chapter and its dialogue are new and need Brent's canon review.
+## Systems
 
-All three images are copied byte-for-byte. Their inclusion was authorized by the repository owner's migration request. That does not establish their underlying commercial licensing; an App Store release still requires an asset-rights review. Third-party npm package licenses remain applicable. No blanket open-source license is assigned to the user's game or art.
+Preserved deterministic transitions, collision-aware movement, combat forecasts, scene loading gates, serialized checkpoint backups, native lifecycle integration, touch controls and Xcode 26 workflow. Added item instances, condition, ammo grades, history, named-owner authority, memory/evidence gates and consequential local faction settlement.
+
+Save schema 2 uses a separate Preferences key. First Light schema 1 remains untouched and is not converted into fictional canonical progress. The opening explains that a new journey is required.
+
+No donor application modules, accounts, online economy, casino, AI dependency or old fantasy loot tables were copied. Registry entries for later regions and signature equipment are foundations, not claims of playable late-campaign content.

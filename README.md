@@ -1,8 +1,8 @@
-# Hollow Realm — First Light
+# Hollow Realm — Canon foundation
 
-A fresh start in **apple-turbo-bannock**. This repository contains a new single-player, offline-first opening chapter: walk through Ironclad, meet Tyrone, recover a core, have Travis visibly upgrade your rifle, break the blockade, and choose what happens to Project Vesper's records.
+The offline Ironclad foundation continues the validated React/TypeScript, Three.js and Capacitor implementation. Wake in Vault 13, meet Tyrone, use the BB gun on an exposed mechanism, restore an M94 with Travis in Bay 13, investigate Vesper recovery contracts, and settle the Ironbound/Ashen dispute with persistent consequences.
 
-**Status: first playable candidate, not an App Store release.** Build, 11 rules tests, four phone/desktop browser checks, and unsigned iOS Simulator compilation/startup pass. Real-device release verification is tracked in `docs/RELEASE.md`; do not mistake a passing rules test for player validation.
+**Status: canonical Ironclad foundation candidate, not a full campaign or App Store release.** See `docs/CANON-HANDOFF.md` for the current verification record and unfinished work. Prior First Light CI results are historical; they do not qualify this revision.
 
 ## Play and build
 
@@ -14,13 +14,13 @@ npm run dev
 npm run check
 ```
 
-Tap the ground to walk. Places navigates through the actual street. WASD/arrow keys move relative to the camera. Follow the objective to advance. Combat is turn-based: watch the enemy's intent, guard its heavy shot, and use coil pulse against armour. Defeat returns you to safety with your gear.
+Tap the ground to walk. Places navigates through the actual street. WASD/arrow keys move relative to the camera. Follow the objective to advance. Combat is turn-based: watch the enemy's intent, guard its heavy shot, and use a fitted peep sight to expose and interrupt a heavy shot. Defeat returns you to safety with your gear.
 
 `npm run test:browser` exercises the full chapter in Chromium at phone and desktop sizes after `npm run build` and `npx playwright install chromium`. CI also compiles, installs and launches an unsigned iOS Simulator build, capturing the native title screen.
 
 ## iOS
 
-An actual Capacitor 8 Xcode project is checked into `ios/`. The web game and three selected artwork files are bundled inside the app; no hosted website, login, server, model subscription, or network connection is required for native gameplay. Preferences stores versioned saves in native UserDefaults, haptics are optional, and app backgrounding checkpoints progress.
+An actual Capacitor 8 Xcode project is checked into `ios/`. The web game and 68 hash-verified canonical artwork files are bundled inside the app; no hosted website, login, server, model subscription, or network connection is required for native gameplay. Preferences stores versioned saves in native UserDefaults, haptics are optional, and app backgrounding checkpoints progress.
 
 ```sh
 npm run ios:sync
@@ -31,7 +31,9 @@ Compile/sign on macOS with a supported Xcode/iOS SDK. `com.moonsquad.hollowrealm
 
 ## Architecture
 
-- `src/game/engine.ts`: pure state transitions; explicit quest gates, combat, inventory and rewards.
+- `src/game/engine.ts`: pure combat transitions and regional routing.
+- `src/game/domain/`: typed inventory, provenance, ammunition, equipment, factions, evidence, memory and save validation.
+- `src/game/regions/`: Ironclad objectives and story rules; later regions remain closed.
 - `src/game/world.ts`: destination data, collision footprints and pathfinding.
 - `src/game/scene.ts`: Three.js diorama, animated player/companion, equipment meshes, camera and input. Rendering does not award rewards.
 - `src/game/platform.ts`: serialized checkpoints with backup validation, native preferences, haptics and procedural audio.

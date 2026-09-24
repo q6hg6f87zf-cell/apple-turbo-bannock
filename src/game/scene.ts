@@ -8,8 +8,17 @@ import {
   type Point,
   type SiteId,
 } from "./world";
-import { objective, enemyTurn, type Save, type Outcome } from "./engine";
+import {
+  objective,
+  enemyTurn,
+  inVault,
+  siteAvailable,
+  type Save,
+  type Outcome,
+} from "./engine";
 
+import { activeWeapon, protection } from "./domain/inventory";
+import { ironcladEffects } from "./domain/narrative";
 export class IroncladScene {
   private renderer: T.WebGLRenderer;
   private scene = new T.Scene();
@@ -17,6 +26,13 @@ export class IroncladScene {
   private player = new T.Group();
   private robot = new T.Group();
   private gun = new T.Group();
+  private rifle = new T.Group();
+  private street = new T.Group();
+  private vault = new T.Group();
+  private traffic = new T.Group();
+  private compactGuards = new T.Group();
+  private ashenScouts = new T.Group();
+  private recoveryObserver = new T.Group();
   private plates = new T.Group();
   private enemies = new Map<string, T.Group>();
   private markers = new Map<SiteId, T.Group>();
@@ -98,17 +114,31 @@ export class IroncladScene {
     sun.shadow.bias = -0.001;
     this.scene.add(sun);
     this.buildWorld();
+    this.buildVault();
+    this.scene.add(
+      this.street,
+      this.vault,
+      this.traffic,
+      this.compactGuards,
+      this.ashenScouts,
+      this.recoveryObserver,
+    );
+    this.buildConsequences();
     this.player = this.human(false);
-    this.player.position.set(state.position.x, 0, state.position.z);
+    this.player.position.set(
+      state.player.position.x,
+      0,
+      state.player.position.z,
+    );
     this.scene.add(this.player);
     this.robot = this.tyrone();
     this.robot.position.set(2, 0, 11);
     this.scene.add(this.robot);
-    for (const id of ["scout", "warden"]) {
+    for (const id of ["scout", "enforcer"]) {
       const site = SITES.find((s) => s.id === id)!;
       const enemy = this.human(true);
       enemy.position.set(site.x, 0, site.z);
-      if (id === "warden") enemy.scale.setScalar(1.5);
+      if (id === "enforcer") enemy.scale.setScalar(1.12);
       this.scene.add(enemy);
       this.enemies.set(id, enemy);
     }
@@ -261,7 +291,7 @@ export class IroncladScene {
       this.staticBox(b.x - 1.5, b.h + 1.5, b.z - 1, 0.5, 3, 0.5, "#566458");
       const sign = this.label(b.label, "#d6ba83", 4.4);
       sign.position.set(b.x, b.h + 1, b.z + 1);
-      this.scene.add(sign);
+      this.street.add(sign);
     }
     // Workshop awning and lit entrance.
     this.staticBox(-5.2, 2.4, -5, 2.5, 0.15, 3.5, "#986f42");
@@ -274,12 +304,12 @@ export class IroncladScene {
       this.staticBox(x, 6.9, -20, 0.15, 0.7, 1.7, "#a58e64");
     const gateSign = this.label("IRONCLAD / NORTH GATE", "#e8c591", 6);
     gateSign.position.set(0, 7.4, -20);
-    this.scene.add(gateSign);
+    this.street.add(gateSign);
     for (let z = -16; z < 15; z += 8)
       for (const x of [-4.6, 4.6]) {
         this.staticBox(x, 1.9, z, 0.12, 3.8, 0.12, "#272f2a");
         const bulb = this.box(
-          this.scene,
+          this.street,
           x,
           3.8,
           z,
@@ -307,12 +337,41 @@ export class IroncladScene {
       if (Math.abs(x) > 5)
         this.staticBox(x, 0.08, z, 0.2 + (i % 3) * 0.13, 0.16, 0.23, "#78806a");
     }
+    // Riveted defensive ring, layered rail steel and mountain silhouettes follow the live street reference.
+    for (let i = 0; i < 28; i++) {
+      const angle = (i / 28) * Math.PI * 2,
+        x = Math.cos(angle) * 24,
+        z = Math.sin(angle) * 28 - 2;
+      this.staticBox(x, 4, z, 3, 8, 1.1, "#414340");
+      this.staticBox(x, 8.2, z, 3.2, 0.3, 1.3, "#655d50");
+    }
+    for (let z = -18; z < 16; z += 1.1)
+      for (let x = -4; x < 5; x += 0.9)
+        this.staticBox(
+          x,
+          0.045,
+          z,
+          0.8,
+          0.08,
+          0.95,
+          Math.round(z * 10 + x) % 2 ? "#555650" : "#484b46",
+        );
+    for (let i = 0; i < 6; i++)
+      this.staticBox(11, 0.3 + i * 0.22, 15, 5 - i * 0.25, 0.2, 0.3, "#665448");
+    for (let i = 0; i < 12; i++) {
+      const mountain = new T.Mesh(
+        new T.ConeGeometry(8 + (i % 4), 12 + (i % 5), 5),
+        this.mat("#424e51"),
+      );
+      mountain.position.set(-50 + i * 9, 4, -48);
+      this.street.add(mountain);
+    }
     for (const [color, geoms] of this.staticBoxes) {
       const merged = mergeGeometries(geoms);
       const mesh = new T.Mesh(merged, this.mat(color));
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      this.scene.add(mesh);
+      this.street.add(mesh);
       geoms.forEach((g) => g.dispose());
     }
     this.staticBoxes.clear();
@@ -333,6 +392,36 @@ export class IroncladScene {
       this.markers.set(site.id, group);
     }
   }
+  private buildVault() {
+    this.box(this.vault, 0, -0.15, 11, 10, 0.3, 12, "#43483e");
+    this.box(this.vault, -5, 1.5, 11, 0.4, 3, 12, "#596054");
+    this.box(this.vault, 0, 1.5, 5, 10, 3, 0.4, "#596054");
+    for (let x = -4; x <= 4; x += 2)
+      this.box(this.vault, x, 2.8, 5.3, 0.12, 0.2, 0.3, "#c8ba80", true);
+    this.box(this.vault, -2, 0.4, 13, 1.3, 0.8, 2.6, "#77725a");
+    this.box(this.vault, -2, 0.85, 13, 1.3, 0.12, 2.6, "#9a987d");
+    this.box(this.vault, -4, 1, 7, 0.5, 2, 0.8, "#778572");
+    this.box(this.vault, 3, 1.2, 7, 1.6, 2.4, 0.3, "#7b6448");
+    const title = this.label("VAULT 13 / SHELTER", "#d1c29b", 5);
+    title.position.set(0, 3.5, 5);
+    this.vault.add(title);
+  }
+  private buildConsequences() {
+    this.box(this.traffic, 2, 0.6, -4, 1.6, 1, 3, "#806a4b");
+    for (const z of [-5, -3])
+      for (const x of [1, 3])
+        this.box(this.traffic, x, 0.25, z, 0.2, 0.5, 0.5, "#252a27");
+    for (const [group, x, z, color] of [
+      [this.compactGuards, 3, -17, "#b39a62"],
+      [this.ashenScouts, -4, -13, "#7f8170"],
+      [this.recoveryObserver, 4, 3, "#464e4a"],
+    ] as const) {
+      const person = this.human(true);
+      person.position.set(x, 0, z);
+      group.add(person);
+      this.box(group, x, 2, z, 0.6, 0.15, 0.3, color);
+    }
+  }
   private human(enemy: boolean) {
     const g = new T.Group();
     const body = enemy ? "#727968" : "#2d3b3b";
@@ -348,8 +437,8 @@ export class IroncladScene {
       0.28,
       0.055,
       0.035,
-      enemy ? "#f88966" : "#ced3b2",
-      enemy,
+      enemy ? "#b19b80" : "#ced3b2",
+      false,
     );
     this.box(g, -0.16, 0.31, 0, 0.2, 0.6, 0.23, "#26302d");
     this.box(g, 0.16, 0.31, 0, 0.2, 0.6, 0.23, "#26302d");
@@ -361,7 +450,7 @@ export class IroncladScene {
       this.box(g, 0, 1.32, 0.18, 0.56, 0.15, 0.08, "#c68d4e");
       this.box(g, -0.2, 1.03, 0.21, 0.12, 0.5, 0.06, "#c68d4e");
       this.box(g, 0, 1, -0.26, 0.4, 0.5, 0.22, "#726949");
-      const rifle = new T.Group();
+      const rifle = this.rifle;
       rifle.position.set(0.36, 0.91, 0.35);
       g.add(rifle);
       this.box(rifle, 0, 0, 0.05, 0.13, 0.17, 0.75, "#303a33");
@@ -369,9 +458,9 @@ export class IroncladScene {
       this.box(rifle, 0, 0, 0.58, 0.08, 0.09, 0.37, "#9eaa93");
       this.gun = new T.Group();
       rifle.add(this.gun);
-      for (let z = 0; z < 0.5; z += 0.13)
-        this.box(this.gun, 0, 0.03, z, 0.22, 0.2, 0.065, "#70d9cd", true);
-      this.box(this.gun, 0, 0.17, 0.12, 0.12, 0.14, 0.25, "#a7c6ad");
+      this.box(this.gun, 0, 0.18, -0.1, 0.06, 0.16, 0.06, "#bca46d");
+      this.box(this.gun, 0, 0.23, -0.1, 0.16, 0.04, 0.06, "#bca46d");
+      this.box(this.gun, 0, 0, 0.4, 0.18, 0.2, 0.06, "#bca46d");
       this.plates = new T.Group();
       g.add(this.plates);
       this.box(this.plates, -0.37, 1.26, 0, 0.3, 0.24, 0.44, "#beaa78");
@@ -410,40 +499,71 @@ export class IroncladScene {
     const prev = this.state;
     this.state = s;
     this.reduced = s.settings.reducedMotion;
-    this.gun.visible = s.coil;
-    this.plates.visible = s.armour;
-    this.enemies.get("scout")!.visible = ["wake", "patrol"].includes(s.stage);
-    this.enemies.get("warden")!.visible = !["decision", "complete"].includes(
-      s.stage,
+    const w = activeWeapon(s),
+      inside = inVault(s),
+      effects = ironcladEffects(s);
+    this.rifle.visible = !!w;
+    this.rifle.scale.setScalar(
+      w?.definition === "bb" ? 0.75 : w?.definition === "work-knife" ? 0.35 : 1,
     );
+    this.gun.visible = !!w?.mods.optic;
+    if (w)
+      this.rifle.children.slice(0, 3).forEach((o) => {
+        if (o instanceof T.Mesh)
+          o.material = this.mat(
+            w.condition < 35
+              ? "#735340"
+              : w.condition < 85
+                ? "#65665a"
+                : "#99a19a",
+          );
+      });
+    this.plates.visible = protection(s) > 0;
+    this.street.visible = !inside;
+    this.vault.visible = inside;
+    this.traffic.visible = !inside && effects.routeSafe;
+    this.compactGuards.visible = !inside && effects.guardSupport;
+    this.ashenScouts.visible = !inside && effects.routeSafe;
+    this.recoveryObserver.visible = !inside && effects.recoveryPatrol;
+    this.enemies.get("scout")!.visible =
+      !inside && !s.encounters.resolved.includes("scout");
+    this.enemies.get("enforcer")!.visible =
+      !inside && !s.encounters.resolved.includes("enforcer");
     const target = objective(s).target;
     for (const [id, m] of this.markers) {
       m.children[1].visible = id === target;
       m.visible =
-        !(id === "cache" && s.cache) &&
-        !(id === "scout" && !["wake", "patrol"].includes(s.stage)) &&
-        !(id === "warden" && ["decision", "complete"].includes(s.stage));
+        siteAvailable(s, id) &&
+        !(
+          id === "cache" && s.progression.rewarded.includes("shelter-supplies")
+        );
     }
-    if (s.ending === "broadcast")
-      for (const lamp of this.lamps) lamp.material = this.mat("#76d4cc", true);
-    if (prev.battle && !s.battle && s.position.z === 12) {
+    for (const lamp of this.lamps)
+      lamp.material = this.mat(effects.routeSafe ? "#d1c09a" : "#b9895a", true);
+    if (
+      prev.encounters.active &&
+      !s.encounters.active &&
+      s.player.position.z === 12
+    ) {
       this.path = [];
       this.destination = null;
-      this.player.position.set(s.position.x, 0, s.position.z);
+      this.player.position.set(s.player.position.x, 0, s.player.position.z);
       this.focus.copy(this.player.position);
     }
-    this.enemyRing.visible = !!s.battle;
-    if (s.battle) {
-      const telegraph = enemyTurn(s.battle);
-      const target = this.enemies.get(s.battle.enemy)!;
+    this.enemyRing.visible = !!s.encounters.active;
+    if (s.encounters.active) {
+      const telegraph = enemyTurn(s.encounters.active);
+      const target = this.enemies.get(s.encounters.active.enemy)!;
       this.enemyRing.position.set(target.position.x, 0.09, target.position.z);
-      this.enemyRing.scale.setScalar(s.battle.enemy === "warden" ? 1.5 : 1);
+      this.enemyRing.scale.setScalar(
+        s.encounters.active.enemy === "enforcer" ? 1.5 : 1,
+      );
       this.enemyRing.material.color.set(
         telegraph.incoming ? "#fa8268" : "#79e6cf",
       );
       this.path = [];
       this.destination = null;
-      const e = this.enemies.get(s.battle.enemy)!;
+      const e = this.enemies.get(s.encounters.active.enemy)!;
       this.player.lookAt(e.position);
       e.lookAt(this.player.position);
     }
@@ -453,13 +573,19 @@ export class IroncladScene {
     this.keys.clear();
   }
   travel(id: SiteId) {
-    if (this.state.battle || this.paused) return;
+    if (
+      this.state.encounters.active ||
+      this.paused ||
+      !siteAvailable(this.state, id)
+    )
+      return;
     const site = SITES.find((p) => p.id === id)!;
-    const approach = id === "scout" || id === "warden" ? 2 : 1;
+    const approach = id === "scout" || id === "enforcer" ? 2 : 1;
     this.moveTo({ x: site.x, z: site.z + approach }, id);
   }
   private moveTo(p: Point, id: SiteId | null) {
-    if (!walkable(p)) return;
+    if (!walkable(p) || (inVault(this.state) && (p.z < 6 || Math.abs(p.x) > 4)))
+      return;
     this.path = findPath(this.player.position, p);
     this.destination = id;
     this.ring.position.set(p.x, 0.06, p.z);
@@ -493,8 +619,10 @@ export class IroncladScene {
     if (out.damage) {
       this.attackTime = 0.32;
       const e = this.enemies.get(
-        this.state.battle?.enemy ??
-          (this.state.stage === "decision" ? "warden" : "scout"),
+        this.state.encounters.active?.enemy ??
+          (this.state.progression.phase === "settlement"
+            ? "enforcer"
+            : "scout"),
       )!;
       this.struckEnemy = e;
       this.floatText(
@@ -523,7 +651,7 @@ export class IroncladScene {
   private pointerUp = (e: PointerEvent) => {
     if (
       this.paused ||
-      this.state.battle ||
+      this.state.encounters.active ||
       Math.hypot(
         e.clientX - this.pointerStart.x,
         e.clientY - this.pointerStart.y,
@@ -593,7 +721,7 @@ export class IroncladScene {
     this.previous = now;
     if (document.hidden) return;
     this.time += dt;
-    if (!this.paused && !this.state.battle) {
+    if (!this.paused && !this.state.encounters.active) {
       if (this.keys.size) {
         let x = 0,
           z = 0;
@@ -620,7 +748,10 @@ export class IroncladScene {
         };
         this.path = [];
         this.destination = null;
-        if (walkable(p)) {
+        if (
+          walkable(p) &&
+          (!inVault(this.state) || (p.z >= 6 && Math.abs(p.x) <= 4))
+        ) {
           this.player.lookAt(p.x, 0, p.z);
           this.player.position.set(p.x, 0, p.z);
           this.moving = true;
@@ -675,7 +806,7 @@ export class IroncladScene {
       this.moving && !this.paused && !this.reduced
         ? Math.abs(Math.sin(this.time * 11)) * 0.055
         : 0;
-    if (this.state.stage !== "wake") {
+    if (this.state.tyrone.companion) {
       this.temp.set(
         this.player.position.x - 1.2,
         0,
@@ -713,7 +844,12 @@ export class IroncladScene {
       this.struckEnemy.rotation.z = !this.reduced
         ? Math.sin(this.hitTime * 25) * this.hitTime * 0.3
         : 0;
-    this.gun.position.z = !this.reduced ? -this.hitTime * 0.16 : 0;
+    this.rifle.position.z =
+      0.35 +
+      (!this.reduced
+        ? -this.hitTime *
+          (activeWeapon(this.state)?.definition === "bb" ? 0.04 : 0.16)
+        : 0);
     this.attackTime = Math.max(0, this.attackTime - dt);
     this.beam.visible = this.attackTime > 0;
     this.renderer.render(this.scene, this.camera);

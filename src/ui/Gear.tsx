@@ -1,85 +1,81 @@
-export function Gear({ coil, armour }: { coil: boolean; armour: boolean }) {
+import type { WeaponInstance } from "../game/domain/types";
+import { WEAPONS } from "../game/domain/registry";
+import { conditionName } from "../game/domain/inventory";
+/** Temporary inspect geometry; canonical identity art is kept separately above it. */
+export function Gear({ weapon }: { weapon: WeaponInstance | undefined }) {
+  if (!weapon) return <p>Your hands are empty.</p>;
+  const d = WEAPONS[weapon.definition],
+    peep = !!weapon.mods.optic,
+    metal =
+      weapon.condition < 35
+        ? "#795543"
+        : weapon.condition < 85
+          ? "#777568"
+          : "#a5aaa0";
   return (
-    <svg
-      className="gear-art"
-      viewBox="0 0 480 210"
-      role="img"
-      aria-label={`${coil ? "Ironbound coil rifle with luminous coils" : "Salvaged rifle"}${armour ? ", reinforced shoulder plates" : ""}`}
-    >
-      <defs>
-        <linearGradient id="metal" x2="0" y2="1">
-          <stop stopColor="#9da893" />
-          <stop offset="1" stopColor="#384b44" />
-        </linearGradient>
-        <radialGradient id="glow">
-          <stop stopColor="#75e8ce" stopOpacity=".3" />
-          <stop offset="1" stopColor="#75e8ce" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="250" cy="160" rx="175" ry="10" fill="#000" opacity=".3" />
-      {coil ? (
-        <ellipse cx="295" cy="102" rx="140" ry="85" fill="url(#glow)" />
+    <figure className="weapon-inspect">
+      {d.art ? (
+        <img className="weapon-identity" src={d.art} alt={d.name} />
       ) : null}
-      <g transform="rotate(-12 240 105)">
-        <path
-          d="M35 100L137 82 151 104 80 139 39 139Z"
-          fill="#97764b"
-          stroke="#c29d64"
-          strokeWidth="2"
-        />
-        <path d="M137 82H323V111H154Z" fill="url(#metal)" stroke="#c0c6a9" />
-        <path
-          d="M171 108L199 109 189 148 169 148Z"
-          fill="#303b32"
-          stroke="#92997e"
-        />
-        <rect x="308" y="88" width="105" height="13" rx="2" fill="#849482" />
-        <rect
-          x="410"
-          y="82"
-          width="25"
-          height="26"
-          rx="2"
-          fill="#394e45"
-          stroke="#94a78e"
-        />
-        <rect x="204" y="70" width="64" height="8" fill="#899882" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <g key={i}>
-            <rect
-              x={255 + i * 12}
-              y="80"
-              width="5"
-              height="33"
-              fill={coil ? "#8beed9" : "#4e5d4f"}
-            />
-            {coil ? (
-              <rect
-                x={254 + i * 12}
-                y="76"
-                width="7"
-                height="5"
-                fill="#d9f9d2"
-              />
-            ) : null}
-          </g>
-        ))}
-        <circle cx="156" cy="95" r="3" fill="#d6c391" />
-        {coil ? (
+      <svg
+        className="gear-art"
+        viewBox="0 0 480 170"
+        role="img"
+        aria-label={`${d.name}: ${conditionName(weapon.condition)}, ${peep ? "fitted peep sight" : "iron sights"}, upgrade ${weapon.stage}`}
+      >
+        <g transform="rotate(-8 240 85)">
           <path
-            d="M211 92V54H283V78"
-            fill="none"
-            stroke="#9eead6"
-            strokeWidth="4"
+            d="M35 88 L145 72 L160 95 L86 130 H35 Z"
+            fill="#84613e"
+            stroke="#c6a270"
           />
-        ) : null}
-      </g>
-      {armour ? (
-        <g fill="url(#metal)" stroke="#d3b578" strokeWidth="2">
-          <path d="M35 175l27-13 22 11-7 23H41Z" />
-          <path d="M395 175l27-13 22 11-7 23h-36Z" />
+          <path d="M140 72 H302 V101 H157Z" fill={metal} />
+          <rect
+            x="300"
+            y="78"
+            width="135"
+            height={d.family === "bb" ? 7 : 12}
+            rx="3"
+            fill={metal}
+          />
+          <path
+            d="M165 104 C180 140 222 133 223 101"
+            fill="none"
+            stroke={metal}
+            strokeWidth="6"
+          />
+          {weapon.condition < 35 ? (
+            <path
+              d="M160 78l30 18m20-20l10 18m25-16l35 12"
+              stroke="#b88150"
+              strokeWidth="4"
+            />
+          ) : null}
+          {weapon.stage >= 1 ? (
+            <rect x="250" y="70" width="12" height="33" fill="#c8b581" />
+          ) : null}
+          {peep ? (
+            <g stroke="#d5c18a" fill="none" strokeWidth="5">
+              <path d="M190 73V52" />
+              <circle cx="190" cy="48" r="9" />
+              <path d="M368 78V68" />
+            </g>
+          ) : null}
+          {weapon.mods.stock ? (
+            <path
+              d="M65 86l20 38m0-41l20 30m0-33l20 21"
+              stroke="#a4a58c"
+              strokeWidth="8"
+            />
+          ) : null}
         </g>
-      ) : null}
-    </svg>
+      </svg>
+      <figcaption>
+        {d.name} · {d.caliber ?? "melee"} · {conditionName(weapon.condition)}{" "}
+        {weapon.condition}%<br />
+        {d.upgrades[weapon.stage]?.name ?? d.operation}
+        {peep ? " · fitted peep" : ""}
+      </figcaption>
+    </figure>
   );
 }

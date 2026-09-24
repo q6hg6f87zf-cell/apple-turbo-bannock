@@ -3,13 +3,18 @@ import { App as NativeApp } from "@capacitor/app";
 import {
   initial,
   interact,
-  upgrade,
+  workshop,
+  respondToTyrone,
+  utilityShot,
+  settle,
+  buyAmmo,
+  siteAvailable,
+  inVault,
+  actionBlocked,
   act,
-  chooseEnding,
   objective,
   level,
   maxHp,
-  damage,
   enemyName,
   intent,
   enemyTurn,
@@ -28,6 +33,10 @@ import {
 } from "../game/platform";
 import type { IroncladScene } from "../game/scene";
 import { Gear } from "./Gear";
+import { Inventory } from "./Inventory";
+import { activeWeapon } from "../game/domain/inventory";
+import { WEAPONS } from "../game/domain/registry";
+import { ironcladEffects } from "../game/domain/narrative";
 
 type Panel = "gear" | "journal" | "settings" | "destinations" | SiteId | null;
 export function App() {
@@ -95,12 +104,15 @@ export function App() {
             live.current,
             (position: Point, id: SiteId | null) => {
               setTravelling("");
-              const s = { ...live.current, position };
+              const s = {
+                ...live.current,
+                player: { ...live.current.player, position },
+              };
               commit(s);
               if (id) {
                 const out = interact(s, id);
                 apply(out);
-                if (!out.state.battle) setPanel(id);
+                if (!out.state.encounters.active) setPanel(id);
               }
             },
             setGraphicsError,
@@ -138,7 +150,11 @@ export function App() {
       if (live.current.started)
         commit({
           ...live.current,
-          position: scene.current?.getPosition() ?? live.current.position,
+          player: {
+            ...live.current.player,
+            position:
+              scene.current?.getPosition() ?? live.current.player.position,
+          },
         });
     };
     const visibility = () => {
@@ -173,11 +189,11 @@ export function App() {
     commit({ ...live.current, started: true });
     setEntered(true);
     setNotice(
-      live.current.battle
-        ? `Encounter resumed. ${intent(live.current.battle)}`
-        : live.current.stage !== "wake"
+      live.current.encounters.active
+        ? `Encounter resumed. ${intent(live.current.encounters.active)}`
+        : live.current.progression.phase !== "wake"
           ? `Checkpoint restored. ${objective(live.current).body}`
-          : "Tap the street to walk. Follow the gold objective, or choose a destination. Tyrone is waiting.",
+          : "You wake in Vault 13. Tap the floor to move. Tyrone is checking whether you can hear him.",
     );
   };
   const travel = (id: SiteId) => {
@@ -206,7 +222,7 @@ export function App() {
     setPanel(p);
   };
   const obj = objective(state),
-    b = state.battle;
+    b = state.encounters.active;
   const telegraph = b ? enemyTurn(b) : null;
   const rankFloor = level(state) === 3 ? 150 : level(state) === 2 ? 60 : 0;
   const rankCeiling = level(state) === 3 ? 150 : level(state) === 2 ? 150 : 60;
@@ -214,6 +230,9 @@ export function App() {
     setPanel(null);
     setConfirmReset(false);
   };
+  const w = activeWeapon(state),
+    wd = w && WEAPONS[w.definition],
+    effects = ironcladEffects(state);
   if (!ready)
     return (
       <main className="loading">
@@ -226,15 +245,15 @@ export function App() {
       <main className="title-screen">
         <img
           className="title-background"
-          src="./art/ironclad-title.jpg"
-          alt="The industrial ruins of the Hollow Realm"
+          src="./art/places/ironclad-street.jpg"
+          alt="Ironclad’s riveted walls and mountain road"
         />
         <div className="title-top">
           <span>MOON SQUAD ORIGINAL</span>
-          <span>FIRST LIGHT / CHAPTER 01</span>
+          <span>ACT I / THE INVOICE</span>
         </div>
         <div className="title-copy">
-          <p className="eyebrow">A road out of the ashes</p>
+          <p className="eyebrow">He had no reason to stop.</p>
           <h1>
             HOLLOW
             <br />
@@ -242,20 +261,20 @@ export function App() {
           </h1>
           <p className="title-description">
             A stranger. An old machine.
-            <br />A city with something to hide.
+            <br />A road neither of you expected.
           </p>
           <button className="primary start" onClick={begin}>
-            {state.started ? "Continue your journey" : "Enter Ironclad"}{" "}
+            {state.started ? "Continue your journey" : "Wake in Vault 13"}{" "}
             <span>↗</span>
           </button>
           <p className="small">
-            A playable opening chapter · Progress saves on this device
+            An offline story · Progress saves on this device
           </p>
           {warning ? <p role="alert">{warning}</p> : null}
         </div>
         <footer className="title-bottom">
-          <span>EXPLORE. BUILD. LEAVE A MARK.</span>
-          <span>EARLY BUILD 0.1</span>
+          <span>EXPLORE. REPAIR. CHOOSE.</span>
+          <span>CANON FOUNDATION / DEVELOPMENT BUILD</span>
         </footer>
       </main>
     );
@@ -269,9 +288,10 @@ export function App() {
         <div className="identity">
           <span className="sigil small-sigil">H</span>
           <div>
-            <span className="eyebrow">THE HOLLOW REALM</span>
+            <span className="eyebrow">HOLLOW REALM</span>
             <h1>
-              Ironclad <span>/ North Quarter</span>
+              {inVault(state) ? "Vault 13" : "Ironclad"}{" "}
+              <span>/ {inVault(state) ? "Found You" : "The Invoice"}</span>
             </h1>
           </div>
         </div>
@@ -288,21 +308,23 @@ export function App() {
         <div>
           <span className="rank">{String(level(state)).padStart(2, "0")}</span>
           <div>
-            <span className="eyebrow">WANDERER</span>
+            <span className="eyebrow">SURVIVOR</span>
             <div className="health-label">
               <span>Health</span>
               <strong>
-                {state.hp} / {maxHp(state)}
+                {state.player.hp} / {maxHp(state)}
               </strong>
             </div>
             <div className="bar">
-              <i style={{ width: `${(state.hp / maxHp(state)) * 100}%` }} />
+              <i
+                style={{ width: `${(state.player.hp / maxHp(state)) * 100}%` }}
+              />
             </div>
           </div>
         </div>
         <p>
-          {state.scrap} scrap <span>·</span> {state.meds} medkits <span>·</span>{" "}
-          {state.xp} XP
+          {state.inventory.supplies.scrap} scrap ·{" "}
+          {state.inventory.supplies.medicine} Field Gel · {state.player.xp} XP
         </p>
         <div
           className="xp-track"
@@ -310,24 +332,24 @@ export function App() {
           aria-label="Rank progress"
           aria-valuemin={rankFloor}
           aria-valuemax={rankCeiling}
-          aria-valuenow={Math.min(state.xp, rankCeiling)}
+          aria-valuenow={Math.min(state.player.xp, rankCeiling)}
         >
           <i
             style={{
-              width: `${level(state) === 3 ? 100 : ((state.xp - rankFloor) / (rankCeiling - rankFloor)) * 100}%`,
+              width: `${level(state) === 3 ? 100 : ((state.player.xp - rankFloor) / (rankCeiling - rankFloor)) * 100}%`,
             }}
           />
         </div>
         <span className="rank-progress">
-          {level(state) === 3
-            ? "CHAPTER RANK COMPLETE"
-            : `${rankCeiling - state.xp} XP TO RANK ${level(state) + 1}`}
+          {wd
+            ? `${wd.name} · ${w!.loaded.rounds}/${wd.capacity} · ${w!.condition}%`
+            : "No weapon · no supplies"}
         </span>
       </section>
       {!b ? (
         <aside className="objective">
           <p className="eyebrow">
-            CHAPTER 01 <span>{obj.step} / 5</span>
+            ACT I <span>{obj.step} / 8</span>
           </p>
           <h2>{obj.title}</h2>
           <p>{obj.body}</p>
@@ -336,14 +358,13 @@ export function App() {
             disabled={!sceneReady}
             onClick={() => travel(obj.target)}
           >
-            {travelling ? `Walking to ${travelling}…` : "Follow objective"}{" "}
-            <span>↗</span>
+            {travelling ? `Walking to ${travelling}…` : "Follow objective"} ↗
           </button>
         </aside>
       ) : null}
       <nav className="utility" aria-label="Game menus">
         <button disabled={!sceneReady} onClick={() => open("gear")}>
-          <span>◇</span>Loadout{state.coil ? <i /> : null}
+          <span>◇</span>Loadout
         </button>
         <button disabled={!sceneReady} onClick={() => open("journal")}>
           <span>≡</span>Journal
@@ -385,68 +406,50 @@ export function App() {
               <i style={{ width: `${(b.hp / b.maxHp) * 100}%` }} />
             </div>
             <p className={`intent ${telegraph?.incoming ? "danger" : ""}`}>
-              {telegraph?.incoming ? "⚠" : "◈"} {intent(b)}
+              {intent(b)}
             </p>
             <div className="combat-stats">
               <span>
-                COIL CHARGE{" "}
-                <b>
-                  {"●".repeat(state.energy)}
-                  {"○".repeat(4 - state.energy)}
-                </b>
+                FOCUS {"●".repeat(state.player.focus)}
+                {"○".repeat(4 - state.player.focus)}
               </span>
               <span>
+                {w?.loaded.rounds ?? 0} loaded ·{" "}
                 {b.exposed
-                  ? "EXPOSED · NEXT STRIKE +4"
-                  : b.enemy === "warden"
-                    ? telegraph?.vulnerable
-                      ? "VENTS OPEN · STRIKE +4"
-                      : `ARMOUR · −${telegraph?.armour} STRIKE`
-                    : "UNARMOURED"}
+                  ? "FIRING ARM EXPOSED"
+                  : `PLATE ${telegraph?.armour}`}
               </span>
             </div>
             <div className="actions">
-              <button
-                disabled={busy || !sceneReady}
-                className="primary"
-                onClick={() => battleAction("strike")}
-              >
-                Strike
-                <small>{actionForecast(state, "strike")}</small>
-              </button>
-              <button
-                disabled={busy || !sceneReady}
-                onClick={() => battleAction("guard")}
-              >
-                Guard<small>{actionForecast(state, "guard")}</small>
-              </button>
-              <button
-                disabled={
-                  busy || !sceneReady || !state.coil || state.energy < 2
-                }
-                onClick={() => battleAction("pulse")}
-              >
-                Coil pulse · 2 charge
-                <small>{actionForecast(state, "pulse")}</small>
-              </button>
-              <button
-                disabled={
-                  busy ||
-                  !sceneReady ||
-                  state.meds === 0 ||
-                  state.hp === maxHp(state)
-                }
-                onClick={() => battleAction("heal")}
-              >
-                Medkit · {state.meds}
-                <small>{actionForecast(state, "heal")}</small>
-              </button>
+              {(
+                ["strike", "guard", "aim", "heal", "reload", "swap"] as Action[]
+              ).map((a) => (
+                <button
+                  key={a}
+                  className={a === "strike" ? "primary" : ""}
+                  disabled={busy || !sceneReady || !!actionBlocked(state, a)}
+                  onClick={() => battleAction(a)}
+                >
+                  {
+                    {
+                      strike: "Fire",
+                      guard: "Guard",
+                      aim: "Aimed shot",
+                      heal: "Field Gel",
+                      reload: "Reload",
+                      swap: "Swap",
+                      retreat: "Retreat",
+                    }[a]
+                  }
+                  <small>{actionForecast(state, a)}</small>
+                </button>
+              ))}
             </div>
             <div className="combat-foot">
               <span role="status">{notice}</span>
               <button
-                disabled={busy || !sceneReady}
                 className="text-button"
+                disabled={busy || !sceneReady}
                 onClick={() => battleAction("retreat")}
               >
                 Retreat
@@ -461,14 +464,10 @@ export function App() {
             >
               <img src="./art/tyrone.jpg" alt="TyroneBot" />
               <div>
-                <p className="eyebrow">
-                  {last?.kind === "upgrade"
-                    ? "LOADOUT UPGRADED"
-                    : "TYRONE / FIELD CHANNEL"}
-                </p>
+                <p className="eyebrow">TYRONE / {state.tyrone.chassis}</p>
                 <p>
                   {!sceneReady
-                    ? "Opening Ironclad…"
+                    ? "Opening the shelter…"
                     : notice ||
                       "Keep moving. This town won’t introduce itself."}
                 </p>
@@ -477,15 +476,10 @@ export function App() {
             <div className="explore-bar">
               <span>
                 <i className="live-dot" />{" "}
-                {travelling
-                  ? `Walking to ${travelling}`
-                  : "Tap the street to move"}
+                {travelling ? `Walking to ${travelling}` : "Tap to walk"}
               </span>
               <button disabled={!sceneReady} onClick={() => travel(obj.target)}>
-                {state.stage === "complete"
-                  ? "Visit workshop"
-                  : "Continue journey"}{" "}
-                ↗
+                Continue journey ↗
               </button>
             </div>
           </>
@@ -502,88 +496,58 @@ export function App() {
           <button className="close" aria-label="Close panel" onClick={close}>
             ×
           </button>
-          {panel === "gear" ? (
-            <>
-              <p className="eyebrow">YOUR EQUIPMENT</p>
-              <h2>{state.coil ? "Ironbound rifle" : "Salvaged rifle"}</h2>
-              <Gear coil={state.coil} armour={state.armour} />
-              <div className="gear-stats">
-                <div>
-                  <strong>{damage(state)}</strong>
-                  <span>STRIKE DAMAGE</span>
-                </div>
-                <div>
-                  <strong>{state.coil ? "12" : "—"}</strong>
-                  <span>COIL PULSE</span>
-                </div>
-                <div>
-                  <strong>{state.armour ? "−2" : "0"}</strong>
-                  <span>DAMAGE TAKEN</span>
-                </div>
-              </div>
-              <p>
-                {state.coil
-                  ? "The recovered core is wired into your rifle. The coil bypasses armour and exposes enemies for a stronger follow-up strike."
-                  : "A serviceable rifle with room to grow. Recover a power core from the Rail Cut and have Travis fit it."}
-              </p>
-              <div className="equipment-row">
-                <span>
-                  {state.armour ? "Rivetguard coat" : "Worn field coat"}
-                </span>
-                <b>{state.armour ? "REINFORCED" : "BASE"}</b>
-              </div>
-              <div className="equipment-row">
-                <span>Weapon modification</span>
-                <b>{state.coil ? "IRONBOUND COIL" : "EMPTY SOCKET"}</b>
-              </div>
-              <button
-                className="primary"
-                disabled={!!b}
-                onClick={() => travel("workshop")}
-              >
-                Visit Travis ↗
-              </button>
-            </>
-          ) : null}
+          {panel === "gear" ? <Inventory state={state} apply={apply} /> : null}
           {panel === "journal" ? (
             <>
-              <p className="eyebrow">A RECORD OF YOUR CHOICES</p>
-              <h2>Field journal</h2>
-              <div className="journal-objective">
-                <span>ACTIVE / {obj.step} OF 5</span>
-                <h3>{obj.title}</h3>
-                <p>{obj.body}</p>
-              </div>
-              {state.journal.length ? (
-                state.journal.map((line, i) => (
-                  <article className="journal-entry" key={i}>
-                    <span>{String(i + 1).padStart(2, "0")}</span>
-                    <p>{line}</p>
-                  </article>
-                ))
-              ) : (
-                <p>Your story starts with the machine waiting on the street.</p>
-              )}
+              <p className="eyebrow">FIELD NOTES</p>
+              <h2>{obj.title}</h2>
+              <p>{obj.body}</p>
+              {Object.values(state.journal.evidence).map((e) => (
+                <details key={e.id}>
+                  <summary>
+                    {e.id.replaceAll("-", " ")} · {e.reliability}
+                  </summary>
+                  <p>{e.source}</p>
+                  <p>{e.tyroneReaction}</p>
+                  <p>Shared: {e.sharedWith.join(", ") || "held privately"}</p>
+                </details>
+              ))}
+              {state.journal.entries.map((line, i) => (
+                <article className="journal-entry" key={i}>
+                  <span>{i + 1}</span>
+                  <p>{line}</p>
+                </article>
+              ))}
             </>
           ) : null}
           {panel === "destinations" ? (
             <>
-              <p className="eyebrow">IRONCLAD / NORTH QUARTER</p>
+              <p className="eyebrow">
+                {inVault(state) ? "VAULT 13" : "IRONCLAD"}
+              </p>
               <h2>Choose your next step.</h2>
-              <p>You will walk to the location through the street.</p>
+              {!inVault(state) ? (
+                <img
+                  className="region-map"
+                  src="./map/regions/ironclad.jpg"
+                  alt="Ironclad regional map"
+                />
+              ) : null}
               <div className="destinations">
-                {SITES.map((site) => (
-                  <button key={site.id} onClick={() => travel(site.id)}>
-                    <span>
-                      <small>
-                        {site.label}
-                        {site.id === obj.target ? " / OBJECTIVE" : ""}
-                      </small>
-                      <strong>{site.name}</strong>
-                    </span>
-                    <span>↗</span>
-                  </button>
-                ))}
+                {SITES.filter((site) => siteAvailable(state, site.id)).map(
+                  (site) => (
+                    <button key={site.id} onClick={() => travel(site.id)}>
+                      <span>
+                        <small>
+                          {site.label}
+                          {site.id === obj.target ? " / OBJECTIVE" : ""}
+                        </small>
+                        <strong>{site.name}</strong>
+                      </span>
+                      <span>↗</span>
+                    </button>
+                  ),
+                )}
               </div>
             </>
           ) : null}
@@ -592,58 +556,55 @@ export function App() {
               <p className="eyebrow">TAKE A BREATH</p>
               <h2>Paused</h2>
               <p>
-                Progress saves after each action and when you arrive. This build
-                plays offline inside the iOS app. Saves stay on this device.
+                Actions and arrivals save on this device. The iOS build plays
+                offline.
               </p>
               {(["sound", "haptics", "reducedMotion"] as const).map((key) => (
                 <label className="setting" key={key}>
                   <span>
-                    {key === "sound"
-                      ? "Sound effects"
+                    {key === "reducedMotion"
+                      ? "Reduce motion"
                       : key === "haptics"
-                        ? "Haptics (supported devices)"
-                        : "Reduce motion"}
+                        ? "Haptics"
+                        : "Sound effects"}
                   </span>
                   <input
                     type="checkbox"
                     checked={state.settings[key]}
-                    onChange={(e) => {
-                      unlockSound();
+                    onChange={(e) =>
                       commit({
                         ...live.current,
                         settings: {
                           ...live.current.settings,
                           [key]: e.target.checked,
                         },
-                      });
-                    }}
+                      })
+                    }
                   />
                 </label>
               ))}
               <p className="small">
-                Controls: tap to walk, choose Places to navigate, or use WASD /
-                arrow keys. Combat waits for your decisions.
+                Tap to walk, choose Places, or use WASD / arrows. Combat waits
+                for your decision.
               </p>
               <details>
                 <summary>Privacy & game information</summary>
                 <p>
-                  This build has no accounts, ads, analytics, purchases, or
-                  remote AI calls. Game progress and preferences are stored on
-                  your device. Starting a new journey replaces your progress.
-                  The web preview’s hosting provider may receive standard
-                  connection logs.
+                  No accounts, ads, analytics, purchases or remote AI calls.
+                  Progress stays on this device. Starting a new journey replaces
+                  this campaign checkpoint.
                 </p>
                 <p>
-                  Hollow Realm · First Light · 0.1.0. A new opening chapter set
-                  in the Hollow Realm.
+                  Canon foundation · development build. Controlled temporary
+                  gameplay meshes.
                 </p>
               </details>
               <button className="primary" onClick={close}>
-                Return to the street
+                Return to the game
               </button>
               {confirmReset ? (
                 <div className="reset-confirm">
-                  <p>Replace this journey and its progress?</p>
+                  <p>Replace this journey?</p>
                   <button
                     onClick={() => {
                       const s = initial();
@@ -671,115 +632,205 @@ export function App() {
               )}
             </>
           ) : null}
-          {panel && SITES.some((s) => s.id === panel) ? (
+          {panel && SITES.some((site) => site.id === panel) ? (
             <>
-              {panel === "tyrone" || panel === "workshop" ? (
+              {panel === "tyrone" ||
+              panel === "workshop" ||
+              panel === "relay" ||
+              panel === "berm" ? (
                 <img
                   className="speaker"
-                  src={`./art/${panel === "tyrone" ? "tyrone" : "travis"}.jpg`}
-                  alt={panel === "tyrone" ? "TyroneBot" : "Travis"}
+                  src={
+                    panel === "tyrone"
+                      ? "./art/tyrone.jpg"
+                      : `./art/npcs/portraits/${panel === "workshop" ? "travis" : panel === "relay" ? "rourke" : "lyra"}.jpg`
+                  }
+                  alt={
+                    panel === "tyrone"
+                      ? "TyroneBot"
+                      : panel === "workshop"
+                        ? "Travis"
+                        : panel === "relay"
+                          ? "Calder Rourke"
+                          : "LYRA-4"
+                  }
                 />
               ) : null}
               <p className="eyebrow">
-                {SITES.find((s) => s.id === panel)?.label}
+                {SITES.find((site) => site.id === panel)?.label}
               </p>
-              <h2>{SITES.find((s) => s.id === panel)?.name}</h2>
+              <h2>{SITES.find((site) => site.id === panel)?.name}</h2>
               <p className="dialogue">{notice}</p>
-              {panel === "workshop" ? (
+              {panel === "board" && state.progression.phase === "board" ? (
                 <>
-                  <Gear coil={state.coil} armour={state.armour} />
-                  {!state.coil && state.core ? (
-                    <div
-                      className="upgrade-preview"
-                      aria-label="Upgrade comparison"
-                    >
-                      <p className="eyebrow">IRONBOUND COIL / BEFORE → AFTER</p>
-                      <p>
-                        Strike{" "}
-                        <strong>
-                          {damage(state)} →{" "}
-                          {damage(upgrade(state, "coil").state)}
-                        </strong>{" "}
-                        · includes rank gain
-                      </p>
-                      <p>
-                        Pulse <strong>Locked → 12 damage</strong>
-                      </p>
-                      <p>
-                        Armour bypass, exposed targets and cannon interrupts.
-                        Health restored on fitting.
-                      </p>
-                      <details>
-                        <summary>Inspect the fitted coil</summary>
-                        <Gear coil armour={state.armour} />
-                      </details>
-                    </div>
-                  ) : null}
+                  <Gear
+                    weapon={Object.values(state.inventory.weapons).find(
+                      (w) => w.definition === "bb",
+                    )}
+                  />
                   <button
                     className="primary"
-                    disabled={!state.core || state.coil}
-                    onClick={() => apply(upgrade(live.current, "coil"))}
+                    onClick={() => apply(utilityShot(live.current))}
                   >
-                    {state.coil ? "Coil fitted ✓" : "Fit Ironbound Coil"}{" "}
-                    <small>
-                      {state.coil
-                        ? "Equipped on your rifle"
-                        : "1 recovered core · +2 damage · unlock pulse"}
-                    </small>
-                  </button>
-                  <button
-                    disabled={state.armour || state.scrap < 4}
-                    onClick={() => apply(upgrade(live.current, "armour"))}
-                  >
-                    {state.armour ? "Armour fitted ✓" : "Reinforce field coat"}{" "}
-                    <small>
-                      4 scrap · absorb 2 damage · visible shoulder plates
-                    </small>
+                    Shoot the exposed release
+                    <small>One BB · open the tool drawer</small>
                   </button>
                 </>
               ) : null}
-              {panel === "gate" && state.stage === "decision" ? (
+              {panel === "workshop" ? (
+                <>
+                  <Gear weapon={w} />
+                  <div className="workshop-actions">
+                    <button
+                      className="primary"
+                      disabled={state.progression.phase !== "repair"}
+                      onClick={() => apply(workshop(live.current, "restore"))}
+                    >
+                      Restore M94 action
+                      <small>2 scrap · clean receiver · reliable cycling</small>
+                    </button>
+                    <button
+                      disabled={
+                        !state.encounters.resolved.includes("scout") ||
+                        Object.values(state.inventory.weapons).some(
+                          (w) => w.definition === "m94" && w.stage >= 2,
+                        )
+                      }
+                      onClick={() => apply(workshop(live.current, "peep"))}
+                    >
+                      Fit Rail Peep
+                      <small>
+                        2 scrap · visible sight · aimed shots and interrupts
+                      </small>
+                    </button>
+                    <button
+                      disabled={!!state.loadout.armor}
+                      onClick={() => apply(workshop(live.current, "armor"))}
+                    >
+                      Fit Rivetguard
+                      <small>
+                        3 scrap · absorb 2 damage · shoulder plate inserts
+                      </small>
+                    </button>
+                    <button
+                      onClick={() => apply(workshop(live.current, "repair"))}
+                    >
+                      Maintain held weapon
+                      <small>
+                        {effects.repairCost} scrap · restore condition, keep
+                        history
+                      </small>
+                    </button>
+                    <button onClick={() => apply(workshop(live.current, "bb"))}>
+                      Work on the BB gun
+                      <small>
+                        Next utility stage requires faction favor or trust
+                      </small>
+                    </button>
+                  </div>
+                </>
+              ) : null}
+              {panel === "relay" &&
+              state.journal.evidence["black-tag-ledger"] &&
+              !state.choices["tyrone-reluctance"] ? (
                 <div className="ending-options">
                   <button
-                    className="primary"
-                    onClick={() =>
-                      apply(chooseEnding(live.current, "broadcast"))
-                    }
+                    onClick={() => apply(respondToTyrone(live.current, true))}
                   >
-                    Broadcast the names
-                    <small>Warn the city. Reveal that you survived.</small>
+                    Give Tyrone time<small>Respect his reluctance.</small>
                   </button>
                   <button
-                    onClick={() => apply(chooseEnding(live.current, "conceal"))}
+                    onClick={() => apply(respondToTyrone(live.current, false))}
                   >
-                    Keep the evidence
-                    <small>
-                      Protect your lead. Leave the transmitter dark.
-                    </small>
+                    Ask what he is withholding
+                    <small>Push for an answer before he is ready.</small>
                   </button>
                 </div>
               ) : null}
-              {state.stage === "complete" && panel === "gate" ? (
+              {panel === "market" ? (
+                <button
+                  className="primary"
+                  disabled={!effects.supplyAccess}
+                  onClick={() => apply(buyAmmo(live.current))}
+                >
+                  Buy .30-30 Ball
+                  <small>12 rounds · {effects.ammoPrice} scrap</small>
+                </button>
+              ) : null}
+              {panel === "gate" && state.progression.phase === "settlement" ? (
+                <Settlement
+                  state={state}
+                  onChoose={(choice, expose) =>
+                    apply(settle(live.current, choice, expose))
+                  }
+                />
+              ) : null}
+              {panel === "gate" && state.progression.phase === "complete" ? (
                 <div className="chapter-complete">
-                  <p className="eyebrow">CHAPTER COMPLETE</p>
+                  <p className="eyebrow">THE INVOICE / SETTLED</p>
                   <h3>
-                    {state.ending === "broadcast"
-                      ? "The city heard you."
-                      : "The secret leaves with you."}
+                    {state.choices["ironclad-settlement"] === "accord"
+                      ? "A working road."
+                      : state.choices["ironclad-settlement"] === "compact"
+                        ? "Steel keeps moving."
+                        : "Supplies reach the mountain."}
                   </h3>
                   <p>
-                    Your choice is saved. This is the end of the current
-                    playable chapter. Ironclad remains open to explore.
+                    Your choice is saved. Ironclad remains playable. Later
+                    regions are not open in this build.
                   </p>
                 </div>
               ) : null}
               <button className="text-button" onClick={close}>
-                Back to the street →
+                Back to the world →
               </button>
             </>
           ) : null}
         </div>
       </dialog>
     </main>
+  );
+}
+function Settlement({
+  state,
+  onChoose,
+}: {
+  state: Save;
+  onChoose: (choice: "compact" | "ashen" | "accord", expose: boolean) => void;
+}) {
+  const [expose, setExpose] = useState(false);
+  return (
+    <div className="ending-options">
+      <label className="setting">
+        <span>
+          Share the black-tag ledger with Compact, Ashen and Relay. This raises
+          Kane’s attention.
+        </span>
+        <input
+          type="checkbox"
+          checked={expose}
+          onChange={(e) => setExpose(e.target.checked)}
+        />
+      </label>
+      <button onClick={() => onChoose("compact", expose)}>
+        Back the Compact
+        <small>Guard escorts and cheaper repairs; Ashen road closes.</small>
+      </button>
+      <button onClick={() => onChoose("ashen", expose)}>
+        Back the Ashen Pack
+        <small>Mountain supplies and safe scouts; Compact stores close.</small>
+      </button>
+      <button
+        className="primary"
+        disabled={state.tyrone.memories.route.status !== "recovered"}
+        onClick={() => onChoose("accord", expose)}
+      >
+        Negotiate a working agreement
+        <small>
+          Requires the old route signal. Paid rail work and mountain supplies;
+          Free Route owes escorts.
+        </small>
+      </button>
+    </div>
   );
 }

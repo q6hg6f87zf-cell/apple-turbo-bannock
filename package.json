@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 8081",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run test && npm run build",
-    "ios:sync": "npm run build && cap sync ios",
+    "ios:sync": "npm run build && cap sync ios && node scripts/verify-art.mjs",
     "ios:open": "cap open ios",
     "test:browser": "playwright test"
   },
