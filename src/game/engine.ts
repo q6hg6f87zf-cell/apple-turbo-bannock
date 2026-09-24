@@ -1,3 +1,4 @@
+import { finishJob } from "./watches";
 import { contractById } from "./expeditions";
 import { finishContract } from "./harbor";
 import { SITES, type SiteId } from "./world";
@@ -71,11 +72,13 @@ export const damage = (s: Save) => {
   return w ? weaponDamage(w) : 0;
 };
 export const enemyName = (b: Battle) =>
-  b.contractId
-    ? (contractById(b.contractId)?.name ?? "Recovery patrol")
-    : b.enemy === "scout"
-      ? "Recovery contract guard"
-      : "Rail recovery enforcer";
+  b.workOrder
+    ? `Recovery sweep / day ${b.workOrder.day}`
+    : b.contractId
+      ? (contractById(b.contractId)?.name ?? "Recovery patrol")
+      : b.enemy === "scout"
+        ? "Recovery contract guard"
+        : "Rail recovery enforcer";
 export type EnemyTurn = {
   name: string;
   phase: string;
@@ -325,6 +328,16 @@ export function act(input: Save, action: Action): Outcome {
   b.hp = Math.max(0, b.hp - dealt);
   if (!b.hp) {
     s.encounters.active = null;
+    if (b.workOrder) {
+      finishJob(s, "patrol", b.workOrder.region);
+      s.player.hp = Math.min(maxHp(s), s.player.hp + 8);
+      return result(
+        s,
+        "Recovery sweep cleared. The settlement pays the work order.",
+        "win",
+        { damage: dealt, incoming: 0 },
+      );
+    }
     if (b.contractId) {
       const contract = contractById(b.contractId);
       if (contract) finishContract(s, contract, "defeated the recovery patrol");
