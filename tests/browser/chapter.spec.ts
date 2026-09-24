@@ -1,6 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 async function visualEvidence(page: Page, name: string) {
-  const shot = await page.screenshot({ type: "jpeg", quality: 65 });
+  const shot = await page.screenshot({
+    path: test.info().outputPath(`${name}.jpg`),
+    type: "jpeg",
+    quality: 65,
+  });
   await test.info().attach(name, { body: shot, contentType: "image/jpeg" });
 }
 async function go(page: Page, name: string) {
@@ -53,7 +57,7 @@ test("Vault 13, repair, contracts, memory, faction choice and saved consequences
   await page.goto("/");
   await page.getByRole("button", { name: /Wake in Vault 13/ }).click();
   await expect(page.locator("canvas")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Found You" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Found You", exact: true })).toBeVisible();
   await visualEvidence(page, info.project.name + "-vault");
   await continueTo(page);
   await expect(page.locator(".dialogue")).toContainText("Three miles east");
@@ -212,9 +216,11 @@ test("a damaged primary checkpoint recovers the last valid backup", async ({
       ),
     )
     .toBe(true);
-  await page.evaluate(() =>
-    localStorage.setItem("CapacitorStorage.hollow-bannock-save-v2", "{damaged"),
-  );
+  // Damage storage in the new document, after the old page's lifecycle save
+  // and before application startup reads it.
+  await page.addInitScript(() => {
+    localStorage.setItem("CapacitorStorage.hollow-bannock-save-v2", "{damaged");
+  });
   await page.reload();
   await expect(page.getByRole("alert")).toContainText(
     "Recovered the previous checkpoint",
