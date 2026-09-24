@@ -1,3 +1,4 @@
+import { emptyLife, validLife } from "../life-state";
 import { contractById } from "../expeditions";
 import { initial, maxHp } from "./state";
 import { WEAPONS, ITEMS } from "./registry";
@@ -50,6 +51,8 @@ export function parseSave(raw: string | null): Save | null {
     const s = JSON.parse(raw);
     if (!record(s) || s.version !== 2 || typeof s.started !== "boolean")
       return null;
+    if (!Object.hasOwn(s, "life")) s.life = emptyLife();
+    if (!validLife(s.life)) return null;
     for (const key of Object.keys(initial()).filter(
       (k) => !["version", "started"].includes(k),
     ))
@@ -386,6 +389,16 @@ export function parseSave(raw: string | null): Save | null {
       return null;
     if (b?.supportUsed !== undefined && typeof b.supportUsed !== "boolean")
       return null;
+    if (
+      b?.workOrder &&
+      (!record(b.workOrder) ||
+        b.workOrder.day !== s.life.day ||
+        b.workOrder.region !== p.region ||
+        b.enemy !== "enforcer" ||
+        b.contractId ||
+        s.life.completed.includes(`${s.life.day}:${p.region}:patrol`))
+    )
+      return null;
     if (b !== null) {
       if (
         !record(b) ||
@@ -396,7 +409,9 @@ export function parseSave(raw: string | null): Save | null {
         b.maxHp !== (b.enemy === "scout" ? 24 : 46) ||
         !integer(b.turn) ||
         typeof b.exposed !== "boolean" ||
-        (!contract && q.phase !== (b.enemy === "scout" ? "rail" : "blockade"))
+        (!contract &&
+          !b.workOrder &&
+          q.phase !== (b.enemy === "scout" ? "rail" : "blockade"))
       )
         return null;
     }
