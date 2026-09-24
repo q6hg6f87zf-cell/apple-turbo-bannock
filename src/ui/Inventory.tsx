@@ -1,6 +1,7 @@
+import { equipItem } from "../game/harbor";
 import type { Save, Outcome } from "../game/engine";
 import { equip, reload } from "../game/engine";
-import { activeWeapon, carriedLoad } from "../game/domain/inventory";
+import { activeWeapon, fieldLoad, loadPenalty } from "../game/domain/inventory";
 import { WEAPONS, ITEMS } from "../game/domain/registry";
 import { AMMO_GRADES } from "../game/domain/types";
 import { Gear } from "./Gear";
@@ -19,7 +20,8 @@ export function Inventory({
       <h2>{d?.name ?? "Empty hands"}</h2>
       <Gear weapon={w} />
       <p>
-        Carried load {carriedLoad(state)} / 12 · {w?.loaded.rounds ?? 0} loaded
+        Field load {fieldLoad(state)} / 12 · {loadPenalty(state)} damage penalty
+        · {w?.loaded.rounds ?? 0} loaded
         {d?.caliber ? ` / ${d.capacity} ${d.caliber}` : ""}
       </p>
       <div className="inventory-list">
@@ -72,14 +74,29 @@ export function Inventory({
         </details>
       ) : null}
       {Object.values(state.inventory.items).map((i) => (
-        <div className="equipment-row" key={i.id}>
+        <button
+          className="equipment-row"
+          key={i.id}
+          disabled={
+            !!state.encounters.active ||
+            !["armor", "rig", "utility", "authority"].includes(
+              ITEMS[i.definition].category,
+            )
+          }
+          onClick={() => apply(equipItem(state, i.id))}
+        >
           <span>{ITEMS[i.definition].name}</span>
-          <b>{ITEMS[i.definition].category}</b>
-        </div>
+          <b>
+            {Object.values(state.loadout).includes(i.id)
+              ? "EQUIPPED"
+              : ITEMS[i.definition].category}
+          </b>
+        </button>
       ))}
       <p className="small">
-        Weapons keep their serial history through repairs. BBs cannot pierce
-        plate. Better ammunition cannot rescue a ruined action.
+        Only equipped slots count toward field load; other gear remains in
+        stores. Weapons keep their serial history through repairs. BBs cannot
+        pierce plate. Better ammunition cannot rescue a ruined action.
       </p>
     </>
   );
