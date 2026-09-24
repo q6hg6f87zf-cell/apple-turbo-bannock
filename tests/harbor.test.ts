@@ -1,3 +1,4 @@
+import { endDay } from "../src/game/watches";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -73,6 +74,7 @@ function opening() {
 }
 function fieldwork(s: Save) {
   for (const c of CONTRACTS.filter((c) => c.region === s.player.region)) {
+    if (s.life.spent >= 6) s = endDay(s, true).state;
     s = camp(s, "maintain").state;
     s = camp(s, "ammo").state;
     s = fight(takeContract(s, c.id, "fight").state);
